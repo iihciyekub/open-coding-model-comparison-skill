@@ -7,9 +7,9 @@ description: Compare multiple model outputs for grounded-theory open-coding batc
 
 ## Version
 
-Current version: `0.1.2`.
+Current version: `0.1.3`.
 
-This version packages the reusable comparison workflow for benchmark-style Batch API open-coding model evaluation. It includes the comparison script, a Chinese-first HTML report that keeps necessary English technical terms such as Batch API, prompt, evidence, Generic Risk, and codes/unit, Batch API cost-efficiency metrics, model-selection scorecard, prompt-design audit, improved prompt v2, and relative source links for human review.
+This version packages the reusable comparison workflow for benchmark-style Batch API open-coding model evaluation. It includes the comparison script, a Chinese-first HTML report that keeps necessary English technical terms such as Batch API, prompt, evidence, Generic Risk, open codes, and codes/unit, Batch API cost-efficiency metrics, model-selection scorecard, prompt-design audit, improved prompt v2, and relative source links for human review.
 
 ## Purpose
 
@@ -94,7 +94,8 @@ The report framing should emphasize model behavior, model-selection indicators, 
 Do not treat more units or lower cost as automatically better.
 
 - More `Units` can mean higher sensitivity, finer segmentation, or weaker AI-boundary control.
-- Higher `Codes/Unit` often means richer open coding, but may increase label fragmentation.
+- `Open codes 数量` is the total number of objects in each output unit's `codes[]` arrays.
+- Higher `Open codes/Unit` often means richer open coding, but may increase label fragmentation.
 - `Generic Risk` is not an error rate. It flags broad digital/data/cloud/analytics/automation passages that need human review.
 - `Exact` evidence overlap is strict. `Containment` often captures the more important case where two models selected the same evidence with different boundaries.
 - Cost metrics use raw batch response token usage when present. If raw usage files are absent, cost fields will be zero or incomplete and should not be interpreted as actual spend.

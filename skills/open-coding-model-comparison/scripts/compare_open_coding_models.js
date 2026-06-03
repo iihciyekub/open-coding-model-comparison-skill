@@ -1015,8 +1015,10 @@ function generateHtml(reportData) {
       tip("文件", "该模型成功收集到的 open-coding JSON 文件数量。不同模型文件数不一致会影响配对比较。"),
       tip("非空会议", "JSON 中至少有一个 meaning unit 的会议数量；越高代表模型识别出更多 AI 讨论会议。"),
       tip("Units", "Meaning units，总共被模型选中的 AI 相关证据片段。多不一定更好，需结合边界风险。"),
-      tip("Codes", "开放编码标签总数；反映模型把证据拆成多少个 grounded codes。"),
-      tip("Codes/Unit", "平均每个 evidence unit 生成几个 codes；越高通常代表编码更细，但也可能更碎片化。"),
+      tip("Open codes 数量", "开放编码条目总数，来自每个 meaning unit 里的 codes[] 数组；这就是 open coding 产出的 code 数。"),
+      tip("Open codes/Unit", "平均每个 evidence unit 生成几个 open codes；越高通常代表编码更细，但也可能更碎片化。"),
+      tip("Unique labels", "去重后的原始 open-code label 数量，用来观察标签分散程度。"),
+      tip("Label families", "轻量归并后的 label family 数量，用来估计 codebook 归并压力。"),
       tip("Batch 成本", "按 raw batch usage 和官方 Batch 折扣价计算的美元成本。"),
       tip("成本/Unit", "每产生一个 meaning unit 的平均成本；用于比较研究产出效率。"),
       tip("Generic Risk", "缺少明确 AI 词、但包含 digital/data/cloud/analytics 等泛技术词的片段比例；这是人工复核优先级，不是自动错误率。")
@@ -1029,7 +1031,9 @@ function generateHtml(reportData) {
       r.units,
       r.codes,
       num(r.avg_codes_per_unit),
-      `$${num(r.estimated_batch_cost_usd, 4)}`,
+      r.unique_normalized_labels,
+      r.label_families,
+      `${num(r.estimated_batch_cost_usd, 4)}`,
       `$${num(r.cost_per_unit_usd, 5)}`,
       pct(r.generic_digital_risk_rate)
     ]
@@ -1199,11 +1203,11 @@ function generateHtml(reportData) {
   const recommendationRows = [
     {
       model: "5.5",
-      use: "適合作為主編碼候選 / Primary coding candidate: codes/unit 最高，能把同一證據拆出更多機制，利於後續 axial coding；需要注意 label 碎片化和 codebook 歸併工作量。"
+      use: "适合作为主编码候选：Open codes/Unit 最高，能把同一证据拆出更多机制，利于后续 axial coding；需要注意 label 碎片化和 codebook 归并工作量。"
     },
     {
       model: "5.4",
-      use: "適合作為高召回補充 / Recall supplement: meaning units 總數最高，更容易發現潛在 AI 討論；需要配合邊界風險審計，確認多出來的是有效機制還是過寬納入。"
+      use: "适合作为高召回补充：meaning units 总数最高，更容易发现潜在 AI 讨论；需要配合边界风险审计，确认多出来的是有效机制还是过宽纳入。"
     },
     {
       model: "5.4mini",
@@ -1213,7 +1217,7 @@ function generateHtml(reportData) {
   const recommendationTable = table(["模型", "建议用法"], recommendationRows, (r) => [escapeHtml(r.model), escapeHtml(r.use)]);
   const selectionRows = [
     { dimension: "召回", m55: "中高", m54: "高", mini: "中", note: "衡量模型抓出候选 evidence 的能力。" },
-    { dimension: "编码粒度", m55: "高", m54: "中", mini: "中低", note: "主要看 codes/unit 与 unit 长度。" },
+    { dimension: "编码粒度", m55: "高", m54: "中", mini: "中低", note: "主要看 Open codes/Unit、Open codes 数量与 unit 长度。" },
     { dimension: "边界控制", m55: "中", m54: "中", mini: "中", note: "Generic Risk 代表人工复核优先级，不是错误率。" },
     { dimension: "格式可靠性", m55: "较好", m54: "中", mini: "较弱", note: "主要看 validation issues。" },
     { dimension: "成本", m55: "高", m54: "中", mini: "低", note: "按官方 Batch 折扣与 raw usage 计算。" },
@@ -1244,7 +1248,7 @@ function generateHtml(reportData) {
   const promptV2SummaryRows = [
     { change: "邊界反例更明確 / Clearer boundary counterexamples", reason: "generic digital/data/cloud/algorithm 是主要歧義面。", effect: "減少把泛數位化討論誤納入 AI 的風險。" },
     { change: "加入 meaning-unit tie-breaker / Add segmentation tie-breaker", reason: "模型常選同一附近證據但邊界不同。", effect: "讓不同模型更穩定地選擇最小完整句。" },
-    { change: "細化 code 拆分規則 / Refine code-splitting rules", reason: "1-4 codes 的自由度讓 5.5 明顯更細。", effect: "減少無必要碎片化，同時保留多機制證據。" },
+    { change: "细化 open code 拆分规则", reason: "1-4 codes 的自由度让 5.5 明显更细。", effect: "减少无必要碎片化，同时保留多机制证据。" },
     { change: "增加 final self-check / Add final self-check", reason: "仍有少量 containment、confidence、schema 問題。", effect: "提高 JSON 和證據紀律穩定性。" }
   ];
   const promptV2SummaryTable = table(["v2 改动", "为什么要改", "预期效果"], promptV2SummaryRows, (r) => [
@@ -1255,7 +1259,7 @@ function generateHtml(reportData) {
   const guideRows = [
     {
       question: "先看哪个指标？",
-      answer: "先看 Units、Codes/Unit、Generic Risk 和 Validation 问题。它们分别回答：抓得多不多、拆得细不细、边界是否偏宽、结果是否可审计。"
+      answer: "先看 Meaning units、Open codes 数量、Open codes/Unit、Generic Risk 和 Validation 问题。它们分别回答：抓得多不多、拆得细不细、边界是否偏宽、结果是否可审计。"
     },
     {
       question: "成本怎么看？",
@@ -1322,7 +1326,7 @@ function generateHtml(reportData) {
       </div>
       <div class="profile-stats">
         <div><strong>${row.units}</strong><span>Units</span></div>
-        <div><strong>${num(row.avg_codes_per_unit)}</strong><span>Codes/Unit</span></div>
+        <div><strong>${num(row.avg_codes_per_unit)}</strong><span>Open codes/Unit</span></div>
         <div><strong>$${num(row.estimated_batch_cost_usd, 2)}</strong><span>Batch 成本</span></div>
         <div><strong>${pct(row.generic_digital_risk_rate)}</strong><span>Generic Risk</span></div>
       </div>
@@ -1445,7 +1449,7 @@ function generateHtml(reportData) {
       ${sectionTitle("fa-compass", "执行摘要")}
       <p>这份报告不分析这批输入资料的实质内容，而是把它当作 benchmark，用来评估 Batch API 下不同模型作为开放编码器的行为差异。</p>
       <ul>
-        <li><strong>5.5</strong> 的 coding density 最高，平均每個 meaning unit 產生 ${num(densestCodes.avg_codes_per_unit)} 個 codes；适合为后续 axial coding 提供更丰富的机制线索。</li>
+        <li><strong>5.5</strong> 的 coding density 最高，平均每个 meaning unit 产生 ${num(densestCodes.avg_codes_per_unit)} 个 open codes；适合为后续 axial coding 提供更丰富的机制线索。</li>
         <li><strong>5.4</strong> 的 meaning units 總數最高（${largestUnits.units}），表现为较高 sensitivity，或者更积极的 candidate evidence discovery。</li>
         <li><strong>${escapeHtml(highestRisk.model)}</strong> 的 generic digital/data 風險比例最高（${pct(highestRisk.generic_digital_risk_rate)}）；这些片段需要人工复核后才能视为实质 AI 讨论。</li>
         <li>按官方標準價和 Batch 50% 折扣估算，本批次成本最低的是 <strong>${escapeHtml(modelSummaries.reduce((best, row) => row.estimated_batch_cost_usd < best.estimated_batch_cost_usd ? row : best, modelSummaries[0]).model)}</strong>；成本结论需要和 evidence 质量、boundary risk、validation issues 一起读。</li>
@@ -1478,14 +1482,15 @@ function generateHtml(reportData) {
     <section id="metrics">
       ${sectionTitle("fa-chart-simple", "关键指标")}
       <div class="grid">
-        <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.output_files, 0)}</span><span class="label">總 JSON 文件 / JSON files</span></div>
+        <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.output_files, 0)}</span><span class="label">JSON 文件总数</span></div>
         <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.units, 0)}</span><span class="label">总 meaning units</span></div>
-        <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.codes, 0)}</span><span class="label">總 open codes</span></div>
-        <div class="metric"><span class="value">${consensus.three_model_components}</span><span class="label">三模型共識 / 3-model consensus</span></div>
+        <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.codes, 0)}</span><span class="label">Open codes 数量</span></div>
+        <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.label_families, 0)}</span><span class="label">Label families 合计</span></div>
+        <div class="metric"><span class="value">${consensus.three_model_components}</span><span class="label">三模型共识 evidence clusters</span></div>
       </div>
       <div class="read-path">
         <div class="read-step"><strong>1. 先看覆盖</strong><span>文件、非空会议、缺失会议决定比较是否公平。</span></div>
-        <div class="read-step"><strong>2. 再看产出</strong><span>Units 和 Codes/Unit 判断敏感度与编码粒度。</span></div>
+        <div class="read-step"><strong>2. 再看产出</strong><span>Meaning units 看证据片段数量，Open codes 数量和 Open codes/Unit 看开放编码产出量与粒度。</span></div>
         <div class="read-step"><strong>3. 同时看风险</strong><span>Generic Risk 和 validation issues 判断是否需要人工复核。</span></div>
         <div class="read-step"><strong>4. 最后看成本</strong><span>成本/非风险 unit 比单纯成本/Unit 更稳。</span></div>
       </div>
@@ -1584,7 +1589,7 @@ function generateHtml(reportData) {
     <section id="recommendations">
       ${sectionTitle("fa-route", "实践建议")}
       ${recommendationTable}
-      <p class="note">推薦工作流：以 5.5 的細粒度 codes 作為主材料，以 5.4 作為高召回補充，以 5.4mini 作為邊界壓力測試；對三模型共識 units 優先進入 axial coding，對單模型獨有且 generic digital risk 的 units 進行人工複核。</p>
+      <p class="note">推荐工作流：以 5.5 的细粒度 open codes 作为主材料，以 5.4 作为高召回补充，以 5.4mini 作为边界压力测试；对三模型共识 units 优先进入 axial coding，对单模型独有且 generic digital risk 的 units 进行人工复核。</p>
       <p class="note">如果研究預算敏感，可以把成本效率加入決策：用 5.4mini 做大規模初篩，用 5.4 做召回補充，用 5.5 只處理高價值或高分歧會議。不過若目標是發表級 grounded coding，仍應優先看證據紀律和人工審計通過率。</p>
     </section>
 
