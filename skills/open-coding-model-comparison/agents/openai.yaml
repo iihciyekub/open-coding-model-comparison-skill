@@ -1,0 +1,4 @@
+interface:
+  display_name: "Open Coding Model Comparison"
+  short_description: "Compare batch open-coding outputs"
+  default_prompt: "Use $open-coding-model-comparison to compare results from multiple model directories and generate a cost-aware HTML report."
