@@ -320,7 +320,7 @@ Human-audit source links:
 
 The final report should be a standalone HTML file that includes:
 
-1. bilingual Traditional Chinese and English executive summary
+1. Chinese-first executive summary with necessary English technical terms preserved
 2. benchmark-purpose section that states the input corpus is a diagnostic sample, not the substantive research object
 3. benchmark-setup section explaining that company-specific examples are audit probes only
 4. three model-profile cards with concise role, strengths, cautions, and key metrics

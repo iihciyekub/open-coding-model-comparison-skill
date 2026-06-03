@@ -7,13 +7,13 @@ description: Compare multiple model outputs for grounded-theory open-coding batc
 
 ## Version
 
-Current version: `0.1.1`.
+Current version: `0.1.2`.
 
-This version packages the reusable comparison workflow for benchmark-style Batch API open-coding model evaluation. It includes the comparison script, bilingual Traditional Chinese/English HTML report generation with a visible language switcher, Batch API cost-efficiency metrics, model-selection scorecard, prompt-design audit, improved prompt v2, and relative source links for human review.
+This version packages the reusable comparison workflow for benchmark-style Batch API open-coding model evaluation. It includes the comparison script, a Chinese-first HTML report that keeps necessary English technical terms such as Batch API, prompt, evidence, Generic Risk, and codes/unit, Batch API cost-efficiency metrics, model-selection scorecard, prompt-design audit, improved prompt v2, and relative source links for human review.
 
 ## Purpose
 
-Use this skill to compare several model runs that open-coded the same transcript meetings with the same prompt. The workflow treats the input corpus as a benchmark sample, not as a substantive company/content analysis. It produces a reusable audit package: model-level metrics, model-selection scorecard, model-profile cards, meeting-level differences, evidence matching, boundary-risk review, label-family comparison, validation issues, Batch API cost efficiency, prompt-design evaluation, and a standalone bilingual Traditional Chinese/English HTML dashboard report.
+Use this skill to compare several model runs that open-coded the same transcript meetings with the same prompt. The workflow treats the input corpus as a benchmark sample, not as a substantive company/content analysis. It produces a reusable audit package: model-level metrics, model-selection scorecard, model-profile cards, meeting-level differences, evidence matching, boundary-risk review, label-family comparison, validation issues, Batch API cost efficiency, prompt-design evaluation, and a standalone Chinese-first HTML dashboard report.
 
 ## Expected Input Layout
 

@@ -998,12 +998,12 @@ function tip(label, detail) {
   };
 }
 
-function bi(zh, en) {
-  return `<span class="bi"><span class="zh">${escapeHtml(zh)}</span><span class="en">${escapeHtml(en)}</span></span>`;
+function bi(zh) {
+  return `<span class="bi">${escapeHtml(zh)}</span>`;
 }
 
-function sectionTitle(icon, zh, en) {
-  return `<h2 class="section-title"><i class="fa-solid ${escapeHtml(icon)}"></i>${bi(zh, en)}</h2>`;
+function sectionTitle(icon, title) {
+  return `<h2 class="section-title"><i class="fa-solid ${escapeHtml(icon)}"></i>${bi(title)}</h2>`;
 }
 
 function generateHtml(reportData) {
@@ -1207,20 +1207,20 @@ function generateHtml(reportData) {
     },
     {
       model: "5.4mini",
-      use: "適合作為輕量對照 / Lightweight comparison: 輸出更少、unit 更長；部分樣例顯示它可能把 generic digital/data 討論納入 AI，因此更適合做差異審計，而不是單獨作為最終編碼源。"
+      use: "适合作为轻量对照：输出更少、unit 更长；部分样例显示它可能把 generic digital/data 讨论纳入 AI，因此更适合做差异审计，而不是单独作为最终编码源。"
     }
   ];
-  const recommendationTable = table(["模型 / Model", "建議用法 / Recommended use"], recommendationRows, (r) => [escapeHtml(r.model), escapeHtml(r.use)]);
+  const recommendationTable = table(["模型", "建议用法"], recommendationRows, (r) => [escapeHtml(r.model), escapeHtml(r.use)]);
   const selectionRows = [
-    { dimension: "召回 / Recall", m55: "中高 / Medium-high", m54: "高 / High", mini: "中 / Medium", note: "衡量模型抓出候選 evidence 的能力。 / Ability to surface candidate evidence." },
-    { dimension: "粒度 / Granularity", m55: "高 / High", m54: "中 / Medium", mini: "中低 / Medium-low", note: "看 codes/unit 與 unit 長度。 / Based on codes per unit and unit length." },
-    { dimension: "邊界控制 / Boundary control", m55: "中 / Medium", m54: "中 / Medium", mini: "中 / Medium", note: "Generic Risk 代表人審優先級，不是錯誤率。 / Audit-priority indicator, not an error rate." },
-    { dimension: "格式可靠性 / Schema reliability", m55: "較好 / Better", m54: "中 / Medium", mini: "較弱 / Weaker", note: "看 validation issues。 / Based on validation issues." },
-    { dimension: "成本 / Cost", m55: "高 / High", m54: "中 / Medium", mini: "低 / Low", note: "按官方 Batch 折扣與 raw usage 計算。 / Computed from raw usage with Batch discount." },
-    { dimension: "建議用途 / Recommended role", m55: "主編碼 / Primary coding", m54: "補召回 / Recall supplement", mini: "初篩 / Screening", note: "場景化選擇，不是單一排名。 / Scenario-based choice, not a single ranking." }
+    { dimension: "召回", m55: "中高", m54: "高", mini: "中", note: "衡量模型抓出候选 evidence 的能力。" },
+    { dimension: "编码粒度", m55: "高", m54: "中", mini: "中低", note: "主要看 codes/unit 与 unit 长度。" },
+    { dimension: "边界控制", m55: "中", m54: "中", mini: "中", note: "Generic Risk 代表人工复核优先级，不是错误率。" },
+    { dimension: "格式可靠性", m55: "较好", m54: "中", mini: "较弱", note: "主要看 validation issues。" },
+    { dimension: "成本", m55: "高", m54: "中", mini: "低", note: "按官方 Batch 折扣与 raw usage 计算。" },
+    { dimension: "建议用途", m55: "主编码", m54: "补召回", mini: "初筛", note: "场景化选择，不是单一排名。" }
   ];
   const selectionScorecard = table(
-    ["選擇維度 / Selection dimension", "5.5", "5.4", "5.4mini", "說明 / Note"],
+    ["选择维度", "5.5", "5.4", "5.4mini", "说明"],
     selectionRows,
     (r) => [escapeHtml(r.dimension), escapeHtml(r.m55), escapeHtml(r.m54), escapeHtml(r.mini), escapeHtml(r.note)]
   );
@@ -1247,73 +1247,73 @@ function generateHtml(reportData) {
     { change: "細化 code 拆分規則 / Refine code-splitting rules", reason: "1-4 codes 的自由度讓 5.5 明顯更細。", effect: "減少無必要碎片化，同時保留多機制證據。" },
     { change: "增加 final self-check / Add final self-check", reason: "仍有少量 containment、confidence、schema 問題。", effect: "提高 JSON 和證據紀律穩定性。" }
   ];
-  const promptV2SummaryTable = table(["v2 改動 / Change", "為什麼要改 / Rationale", "預期效果 / Expected effect"], promptV2SummaryRows, (r) => [
+  const promptV2SummaryTable = table(["v2 改动", "为什么要改", "预期效果"], promptV2SummaryRows, (r) => [
     escapeHtml(r.change),
     escapeHtml(r.reason),
     escapeHtml(r.effect)
   ]);
   const guideRows = [
     {
-      question: "先看哪個指標？ / What to read first?",
-      answer: "先看 Units、Codes/Unit、Generic Risk 和 Validation 問題。它們分別回答：抓得多不多、拆得細不細、邊界是否偏寬、結果是否可審計。"
+      question: "先看哪个指标？",
+      answer: "先看 Units、Codes/Unit、Generic Risk 和 Validation 问题。它们分别回答：抓得多不多、拆得细不细、边界是否偏宽、结果是否可审计。"
     },
     {
-      question: "成本怎麼讀？ / How to read cost?",
-      answer: "成本/Unit 和成本/code 是產出效率；成本/非風險 unit 更穩，因為它降低 generic digital/data 片段造成的產出虛高。"
+      question: "成本怎么看？",
+      answer: "成本/Unit 和成本/code 是产出效率；成本/非风险 unit 更稳，因为它降低 generic digital/data 片段造成的产出虚高。"
     },
     {
-      question: "Exact overlap 低是不是壞事？ / Is low exact overlap bad?",
-      answer: "不一定。Batch 結果經常邊界不同，所以 containment match 也很重要。Exact 低但 containment 高，通常說明模型看的是同一段附近證據。"
+      question: "Exact overlap 低是不是坏事？",
+      answer: "不一定。Batch 结果经常边界不同，所以 containment match 也很重要。Exact 低但 containment 高，通常说明模型看的是同一段附近证据。"
     },
     {
-      question: "Generic Risk 是錯誤率嗎？ / Is Generic Risk an error rate?",
-      answer: "不是。它只是把 digital/data/cloud/analytics 等泛技術片段標出來，提醒人工確認是否有足夠 AI 語境。"
+      question: "Generic Risk 是错误率吗？",
+      answer: "不是。它只是把 digital/data/cloud/analytics 等泛技术片段标出来，提醒人工确认是否有足够 AI 语境。"
     }
   ];
-  const guideTable = table(["問題 / Question", "怎麼理解 / Interpretation"], guideRows, (r) => [escapeHtml(r.question), escapeHtml(r.answer)]);
+  const guideTable = table(["问题", "怎么理解"], guideRows, (r) => [escapeHtml(r.question), escapeHtml(r.answer)]);
   const metricFrameworkRows = [
-    { family: "完整性與格式可靠性 / Completeness and reliability", question: "Batch 輸出是否穩定可用？ / Are outputs usable and auditable?", metrics: "coverage, empty files, invalid JSON, validation issues" },
-    { family: "召回與敏感度 / Recall and sensitivity", question: "模型抓候選 evidence 的能力如何？ / How much candidate evidence does the model surface?", metrics: "nonempty rate, units, high/medium confidence, unique units" },
-    { family: "邊界控制 / Boundary control", question: "是否過度納入 generic digital/data？ / Does it over-include generic digital/data?", metrics: "generic digital risk rate, explicit-vs-implicit AI ratio" },
-    { family: "編碼粒度與理論可用性 / Coding granularity and theoretical usability", question: "輸出是否適合後續 axial coding？ / Is it useful for downstream axial coding?", metrics: "codes/unit, unit length, label families, codebook burden" },
-    { family: "成本效率 / Cost efficiency", question: "有效研究產出的成本是多少？ / What is the cost per useful research output?", metrics: "cost/unit, cost/code, cost/non-risk unit" },
-    { family: "Prompt 穩定性 / Prompt stability", question: "prompt 是否讓不同模型產生可比結果？ / Does the prompt stabilize model behavior?", metrics: "evidence overlap, containment, schema discipline, prompt audit" }
+    { family: "完整性与格式可靠性", question: "Batch 输出是否稳定可用？", metrics: "coverage, empty files, invalid JSON, validation issues" },
+    { family: "召回与敏感度", question: "模型抓候选 evidence 的能力如何？", metrics: "nonempty rate, units, high/medium confidence, unique units" },
+    { family: "边界控制", question: "是否过度纳入 generic digital/data？", metrics: "generic digital risk rate, explicit-vs-implicit AI ratio" },
+    { family: "编码粒度与理论可用性", question: "输出是否适合后续 axial coding？", metrics: "codes/unit, unit length, label families, codebook burden" },
+    { family: "成本效率", question: "有效研究产出的成本是多少？", metrics: "cost/unit, cost/code, cost/non-risk unit" },
+    { family: "Prompt 稳定性", question: "prompt 是否让不同模型产生可比结果？", metrics: "evidence overlap, containment, schema discipline, prompt audit" }
   ];
   const metricFrameworkTable = table(
-    ["指標組 / Metric family", "回答的問題 / Question", "代表指標 / Representative metrics"],
+    ["指标组", "回答的问题", "代表指标"],
     metricFrameworkRows,
     (r) => [escapeHtml(r.family), escapeHtml(r.question), escapeHtml(r.metrics)]
   );
   const modelProfileMeta = {
     "5.5": {
       icon: "fa-layer-group",
-      title: "細粒度主編碼者 / Granular primary coder",
-      thesis: "更願意把同一證據拆成多個機制，適合產出豐富的開放編碼材料。",
-      bestFor: "主編碼候選、機制提取、後續 axial coding 輸入",
-      caution: "成本最高，label/codebook 歸併壓力更大。"
+      title: "细粒度主编码者",
+      thesis: "更愿意把同一证据拆成多个机制，适合产出丰富的开放编码材料。",
+      bestFor: "主编码候选、机制提取、后续 axial coding 输入",
+      caution: "成本最高，label/codebook 归并压力更大。"
     },
     "5.4": {
       icon: "fa-magnifying-glass-chart",
-      title: "高召回發現者 / High-recall discoverer",
-      thesis: "meaning units 總數最高，更像是在幫你多抓潛在 AI 討論。",
-      bestFor: "召回補充、漏抓檢查、模型間分歧發現",
-      caution: "需要確認多出來的 units 是有效機制還是邊界放寬。"
+      title: "高召回发现者",
+      thesis: "meaning units 总数最高，更像是在帮你多抓潜在 AI 讨论。",
+      bestFor: "召回补充、漏抓检查、模型间分歧发现",
+      caution: "需要确认多出来的 units 是有效机制还是边界放宽。"
     },
     "5.4mini": {
       icon: "fa-gauge-high",
-      title: "低成本壓力測試者 / Low-cost stress tester",
-      thesis: "成本最低、輸出更少，適合作為預算敏感的大規模對照。",
-      bestFor: "初篩、成本敏感分析、邊界壓力測試",
-      caution: "部分 generic digital/data 片段仍需人工複核。"
+      title: "低成本压力测试者",
+      thesis: "成本最低、输出更少，适合作为预算敏感的大规模对照。",
+      bestFor: "初筛、成本敏感分析、边界压力测试",
+      caution: "部分 generic digital/data 片段仍需人工复核。"
     }
   };
   const modelProfileCards = modelSummaries.map((row) => {
     const meta = modelProfileMeta[row.model] || {
       icon: "fa-cube",
-      title: "模型畫像 / Model profile",
-      thesis: "該模型的定位需要結合指標解釋。",
-      bestFor: "對照分析 / Comparative analysis",
-      caution: "需要人工審計 / Requires human audit."
+      title: "模型画像",
+      thesis: "该模型的定位需要结合指标解释。",
+      bestFor: "对照分析",
+      caution: "需要人工审计。"
     };
     return `<article class="profile-card profile-${escapeHtml(row.model.replace(/[^a-zA-Z0-9]/g, ""))}">
       <div class="profile-head">
@@ -1323,7 +1323,7 @@ function generateHtml(reportData) {
       <div class="profile-stats">
         <div><strong>${row.units}</strong><span>Units</span></div>
         <div><strong>${num(row.avg_codes_per_unit)}</strong><span>Codes/Unit</span></div>
-        <div><strong>$${num(row.estimated_batch_cost_usd, 2)}</strong><span>Batch 成本 / Cost</span></div>
+        <div><strong>$${num(row.estimated_batch_cost_usd, 2)}</strong><span>Batch 成本</span></div>
         <div><strong>${pct(row.generic_digital_risk_rate)}</strong><span>Generic Risk</span></div>
       </div>
       <p class="profile-use"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(meta.bestFor)}</p>
@@ -1334,18 +1334,8 @@ function generateHtml(reportData) {
   const css = `
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; color: #182026; background: #f7f8fa; line-height: 1.55; }
     header { background: #12343b; color: white; padding: 38px 48px 30px; }
-    .header-bar { display: flex; gap: 20px; justify-content: space-between; align-items: flex-start; }
-    .header-copy { min-width: 0; }
     header h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
     header p { margin: 0; max-width: 980px; color: #dce8ea; }
-    .lang-switch { display: inline-flex; gap: 3px; padding: 4px; border: 1px solid rgba(255,255,255,.28); border-radius: 8px; background: rgba(255,255,255,.08); white-space: nowrap; }
-    .lang-switch button { border: 0; border-radius: 6px; background: transparent; color: #dce8ea; padding: 7px 10px; font: inherit; font-size: 13px; cursor: pointer; }
-    .lang-switch button.active { background: #fff; color: #12343b; font-weight: 700; }
-    .lang-switch button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-    .en-copy { color: inherit; }
-    body.lang-zh .en-copy, body.lang-zh .dual-sep, body.lang-zh .bi .en { display: none; }
-    body.lang-en .zh-copy, body.lang-en .dual-sep, body.lang-en .bi .zh { display: none; }
-    body.lang-en .bi { display: inline-flex; }
     .page-shell { max-width: 1480px; margin: 0 auto; padding: 28px; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 20px; align-items: start; }
     main { min-width: 0; padding: 0 0 28px; }
     .side-nav { position: sticky; top: 18px; background: white; border: 1px solid #dfe5e8; border-radius: 8px; padding: 14px; max-height: calc(100vh - 36px); overflow: auto; }
@@ -1357,9 +1347,6 @@ function generateHtml(reportData) {
     h2 { margin: 0 0 12px; font-size: 21px; }
     h3 { margin: 0 0 10px; font-size: 17px; }
     .bi { display: inline-flex; flex-direction: column; gap: 1px; }
-    .bi .zh { font-weight: 700; }
-    .bi .en { color: #6b7880; font-size: 12px; font-weight: 500; line-height: 1.25; }
-    header .bi .en { color: #dce8ea; }
     .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
     .section-title { display: inline-flex; align-items: center; gap: 9px; }
     .section-title i { color: #2f7d72; font-size: 18px; }
@@ -1405,7 +1392,7 @@ function generateHtml(reportData) {
     .read-step { border-left: 4px solid #2f7d72; background: #f4faf8; padding: 12px; border-radius: 8px; }
     .read-step strong { display: block; color: #12343b; margin-bottom: 4px; }
     .read-step span { color: #52626b; font-size: 13px; }
-    @media (max-width: 900px) { .grid, .cards, .profile-grid { grid-template-columns: 1fr; } header { padding: 28px 22px; } .header-bar { display: block; } .lang-switch { margin-top: 16px; } .page-shell { display: block; padding: 18px; } .side-nav { position: static; max-height: none; margin-bottom: 18px; } .side-nav a { display: inline-flex; margin: 2px; } }
+    @media (max-width: 900px) { .grid, .cards, .profile-grid { grid-template-columns: 1fr; } header { padding: 28px 22px; } .page-shell { display: block; padding: 18px; } .side-nav { position: static; max-height: none; margin-bottom: 18px; } .side-nav a { display: inline-flex; margin: 2px; } }
     @media (max-width: 900px) { .read-path { grid-template-columns: 1fr; } }
   `;
 
@@ -1422,85 +1409,74 @@ function generateHtml(reportData) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>${css}</style>
 </head>
-<body class="lang-dual">
+<body>
   <header>
-    <div class="header-bar">
-      <div class="header-copy">
-        <h1><span class="zh-copy">5.5 / 5.4 / 5.4mini Batch 開放編碼模型評估報告</span><span class="en-copy">5.5 / 5.4 / 5.4mini Batch Open-Coding Model Evaluation Report</span></h1>
-        <p><span class="zh-copy">用一批隨機 benchmark 輸入評估同一 prompt、同一 Batch API 流程下不同模型的輸出差異、成本效率、可審計性、模型選擇指標與 prompt 改進方向。</span><span class="dual-sep"> / </span><span class="en-copy">A benchmark-style evaluation of model behavior, cost efficiency, auditability, model-selection metrics, and prompt improvement under the same Batch API workflow.</span> <span class="zh-copy">生成時間</span><span class="en-copy">Generated</span>: ${escapeHtml(generated_at)}</p>
-      </div>
-      <div class="lang-switch" role="group" aria-label="Language switch">
-        <button type="button" data-lang-toggle="zh">繁中</button>
-        <button type="button" data-lang-toggle="en">English</button>
-        <button type="button" data-lang-toggle="dual">對照</button>
-      </div>
-    </div>
+    <h1>5.5 / 5.4 / 5.4mini Batch 开放编码模型评估报告</h1>
+    <p>用一批随机 benchmark 输入，评估同一 prompt、同一 Batch API 流程下不同模型的输出差异、成本效率、可审计性、模型选择指标与 prompt 改进方向。生成时间：${escapeHtml(generated_at)}</p>
   </header>
   <div class="page-shell">
-    <nav class="side-nav" aria-label="報告導航 / Report navigation">
-      <h2><span class="zh-copy">報告導航</span><span class="en-copy">Report nav</span></h2>
-      <a href="#summary"><i class="fa-solid fa-compass"></i><span class="zh-copy">執行摘要</span><span class="en-copy">Summary</span></a>
-      <a href="#purpose"><i class="fa-solid fa-bullseye"></i><span class="zh-copy">評估目的</span><span class="en-copy">Purpose</span></a>
-      <a href="#setup"><i class="fa-solid fa-flask"></i><span class="zh-copy">Benchmark 設定</span><span class="en-copy">Setup</span></a>
-      <a href="#profiles"><i class="fa-solid fa-id-card-clip"></i><span class="zh-copy">模型畫像</span><span class="en-copy">Profiles</span></a>
-      <a href="#scorecard"><i class="fa-solid fa-list-check"></i><span class="zh-copy">選型 Scorecard</span><span class="en-copy">Selection scorecard</span></a>
-      <a href="#metrics"><i class="fa-solid fa-chart-simple"></i><span class="zh-copy">關鍵指標</span><span class="en-copy">Metrics</span></a>
-      <a href="#metric-framework"><i class="fa-solid fa-sitemap"></i><span class="zh-copy">指標框架</span><span class="en-copy">Framework</span></a>
-      <a href="#reading-guide"><i class="fa-solid fa-book-open-reader"></i><span class="zh-copy">讀表指南</span><span class="en-copy">Guide</span></a>
-      <a href="#method"><i class="fa-solid fa-scale-balanced"></i><span class="zh-copy">方法口徑</span><span class="en-copy">Method</span></a>
-      <a href="#model-table"><i class="fa-solid fa-table-columns"></i><span class="zh-copy">模型對比</span><span class="en-copy">Model table</span></a>
-      <a href="#cost"><i class="fa-solid fa-coins"></i><span class="zh-copy">成本效率</span><span class="en-copy">Cost</span></a>
-      <a href="#quality"><i class="fa-solid fa-clipboard-check"></i><span class="zh-copy">品質門檻</span><span class="en-copy">Quality</span></a>
-      <a href="#prompt-audit"><i class="fa-solid fa-pen-nib"></i><span class="zh-copy">Prompt 評價</span><span class="en-copy">Prompt audit</span></a>
+    <nav class="side-nav" aria-label="报告导航">
+      <h2>报告导航</h2>
+      <a href="#summary"><i class="fa-solid fa-compass"></i>执行摘要</a>
+      <a href="#purpose"><i class="fa-solid fa-bullseye"></i>评估目的</a>
+      <a href="#setup"><i class="fa-solid fa-flask"></i>Benchmark 设置</a>
+      <a href="#profiles"><i class="fa-solid fa-id-card-clip"></i>模型画像</a>
+      <a href="#scorecard"><i class="fa-solid fa-list-check"></i>模型选择 Scorecard</a>
+      <a href="#metrics"><i class="fa-solid fa-chart-simple"></i>关键指标</a>
+      <a href="#metric-framework"><i class="fa-solid fa-sitemap"></i>指标框架</a>
+      <a href="#reading-guide"><i class="fa-solid fa-book-open-reader"></i>读表指南</a>
+      <a href="#method"><i class="fa-solid fa-scale-balanced"></i>方法口径</a>
+      <a href="#model-table"><i class="fa-solid fa-table-columns"></i>模型对比</a>
+      <a href="#cost"><i class="fa-solid fa-coins"></i>成本效率</a>
+      <a href="#quality"><i class="fa-solid fa-clipboard-check"></i>质量门槛</a>
+      <a href="#prompt-audit"><i class="fa-solid fa-pen-nib"></i>Prompt 评价</a>
       <a href="#prompt-v2"><i class="fa-solid fa-wand-magic-sparkles"></i>Prompt v2</a>
-      <a href="#pairwise"><i class="fa-solid fa-link"></i><span class="zh-copy">Evidence 重疊</span><span class="en-copy">Evidence overlap</span></a>
+      <a href="#pairwise"><i class="fa-solid fa-link"></i>Evidence 重叠</a>
       <a href="#consensus"><i class="fa-solid fa-diagram-project"></i>Consensus</a>
       <a href="#labels"><i class="fa-solid fa-tags"></i>Label Family</a>
       <a href="#boundary"><i class="fa-solid fa-triangle-exclamation"></i>Boundary Risk</a>
-      <a href="#divergence"><i class="fa-solid fa-arrows-left-right-to-line"></i><span class="zh-copy">高分歧會議</span><span class="en-copy">High divergence</span></a>
-      <a href="#unique"><i class="fa-solid fa-eye"></i><span class="zh-copy">獨有 Evidence</span><span class="en-copy">Unique evidence</span></a>
-      <a href="#recommendations"><i class="fa-solid fa-route"></i><span class="zh-copy">實踐建議</span><span class="en-copy">Advice</span></a>
-      <a href="#outputs"><i class="fa-solid fa-folder-open"></i><span class="zh-copy">輸出文件</span><span class="en-copy">Outputs</span></a>
+      <a href="#divergence"><i class="fa-solid fa-arrows-left-right-to-line"></i>高分歧会议</a>
+      <a href="#unique"><i class="fa-solid fa-eye"></i>独有 Evidence</a>
+      <a href="#recommendations"><i class="fa-solid fa-route"></i>实践建议</a>
+      <a href="#outputs"><i class="fa-solid fa-folder-open"></i>输出文件</a>
     </nav>
     <main>
     <section id="summary">
-      ${sectionTitle("fa-compass", "執行摘要", "Executive summary")}
-      <p>這份報告不分析這批輸入資料的實質內容，而是把它當作 benchmark，用來評估 Batch API 下不同模型作為開放編碼器的行為差異。 / This report treats the input set as a benchmark for evaluating model behavior, not as a substantive analysis of the sampled companies or transcripts.</p>
+      ${sectionTitle("fa-compass", "执行摘要")}
+      <p>这份报告不分析这批输入资料的实质内容，而是把它当作 benchmark，用来评估 Batch API 下不同模型作为开放编码器的行为差异。</p>
       <ul>
-        <li><strong>5.5</strong> 的 coding density 最高，平均每個 meaning unit 產生 ${num(densestCodes.avg_codes_per_unit)} 個 codes；it is useful when downstream axial coding needs richer mechanisms.</li>
-        <li><strong>5.4</strong> 的 meaning units 總數最高（${largestUnits.units}），表現為較高 sensitivity 或更積極的 candidate evidence discovery.</li>
-        <li><strong>${escapeHtml(highestRisk.model)}</strong> 的 generic digital/data 風險比例最高（${pct(highestRisk.generic_digital_risk_rate)}）；these segments require human audit before being treated as substantive AI discussion.</li>
-        <li>按官方標準價和 Batch 50% 折扣估算，本批次成本最低的是 <strong>${escapeHtml(modelSummaries.reduce((best, row) => row.estimated_batch_cost_usd < best.estimated_batch_cost_usd ? row : best, modelSummaries[0]).model)}</strong>；cost should be read together with evidence quality, boundary risk, and validation issues.</li>
-        <li>Exact text overlap 明顯低於總匹配量，表示同一 evidence 常因 unit boundary、unit_id 或 label wording 不同而看起來不一致；therefore fuzzy/containment comparison is necessary.</li>
+        <li><strong>5.5</strong> 的 coding density 最高，平均每個 meaning unit 產生 ${num(densestCodes.avg_codes_per_unit)} 個 codes；适合为后续 axial coding 提供更丰富的机制线索。</li>
+        <li><strong>5.4</strong> 的 meaning units 總數最高（${largestUnits.units}），表现为较高 sensitivity，或者更积极的 candidate evidence discovery。</li>
+        <li><strong>${escapeHtml(highestRisk.model)}</strong> 的 generic digital/data 風險比例最高（${pct(highestRisk.generic_digital_risk_rate)}）；这些片段需要人工复核后才能视为实质 AI 讨论。</li>
+        <li>按官方標準價和 Batch 50% 折扣估算，本批次成本最低的是 <strong>${escapeHtml(modelSummaries.reduce((best, row) => row.estimated_batch_cost_usd < best.estimated_batch_cost_usd ? row : best, modelSummaries[0]).model)}</strong>；成本结论需要和 evidence 质量、boundary risk、validation issues 一起读。</li>
+        <li>Exact text overlap 明顯低於總匹配量，表示同一 evidence 常因 unit boundary、unit_id 或 label wording 不同而看起来不一致，因此 fuzzy/containment comparison 是必要的。</li>
       </ul>
     </section>
 
     <section id="purpose">
-      ${sectionTitle("fa-bullseye", "評估目的", "Evaluation purpose")}
-      <p>本報告主要回答三個問題：同一 prompt 與同一 Batch API 流程下，不同模型的開放編碼結果差異有多大；應該用哪些指標選擇模型；目前 prompt 的穩定性如何，以及 proposed prompt v2 應該如何被驗證。</p>
-      <p class="note">The goal is model and prompt evaluation: difference magnitude, model-selection criteria, current prompt diagnosis, and future prompt-v2 validation metrics.</p>
+      ${sectionTitle("fa-bullseye", "评估目的")}
+      <p>本报告主要回答三个问题：同一 prompt 与同一 Batch API 流程下，不同模型的开放编码结果差异有多大；应该用哪些指标选择模型；目前 prompt 的稳定性如何，以及 proposed prompt v2 应该如何被验证。</p>
     </section>
 
     <section id="setup">
-      ${sectionTitle("fa-flask", "Benchmark 設定", "Benchmark setup")}
-      <p>輸入資料只是隨機選取的測試樣本。公司、年份、產業或具體 evidence 內容主要作為 audit probes，用於觀察模型行為；不應被解讀為對公司 AI 策略本身的研究結論。</p>
-      <p class="note">The sampled data are diagnostic probes. Company-specific examples are used to inspect model behavior, boundary control, and evidence selection, not to make substantive claims about those companies.</p>
+      ${sectionTitle("fa-flask", "Benchmark 设置")}
+      <p>输入资料只是随机选取的测试样本。公司、年份、产业或具体 evidence 内容主要作为 audit probes，用于观察模型行为；不应被解读为对公司 AI 策略本身的研究结论。</p>
     </section>
 
     <section id="profiles">
-      ${sectionTitle("fa-id-card-clip", "三組模型畫像", "Three model profiles")}
-      <p class="note">先用畫像建立直覺，再看後面的表格。這裡的定位不是最終排名，而是把每個模型在本批開放編碼 benchmark 中的工作風格講清楚。 / These profiles are role summaries, not final rankings.</p>
+      ${sectionTitle("fa-id-card-clip", "三组模型画像")}
+      <p class="note">先用画像建立直觉，再看后面的表格。这里的定位不是最终排名，而是把每个模型在本批开放编码 benchmark 中的工作风格讲清楚。</p>
       <div class="profile-grid">${modelProfileCards}</div>
     </section>
 
     <section id="scorecard">
-      ${sectionTitle("fa-list-check", "模型選擇 Scorecard", "Model selection scorecard")}
-      <p class="note">這不是自動排名，而是把模型選擇變成場景化決策。 / This is not an automatic ranking; it is a scenario-based model-selection guide.</p>
+      ${sectionTitle("fa-list-check", "模型选择 Scorecard")}
+      <p class="note">这不是自动排名，而是把模型选择变成场景化决策。</p>
       ${selectionScorecard}
     </section>
 
     <section id="metrics">
-      ${sectionTitle("fa-chart-simple", "關鍵指標", "Key metrics")}
+      ${sectionTitle("fa-chart-simple", "关键指标")}
       <div class="grid">
         <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.output_files, 0)}</span><span class="label">總 JSON 文件 / JSON files</span></div>
         <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.units, 0)}</span><span class="label">总 meaning units</span></div>
@@ -1508,138 +1484,116 @@ function generateHtml(reportData) {
         <div class="metric"><span class="value">${consensus.three_model_components}</span><span class="label">三模型共識 / 3-model consensus</span></div>
       </div>
       <div class="read-path">
-        <div class="read-step"><strong>1. 先看覆蓋 / Coverage</strong><span>文件、非空會議、缺失會議決定比較是否公平。</span></div>
-        <div class="read-step"><strong>2. 再看產出 / Output</strong><span>Units 和 Codes/Unit 判斷敏感度與編碼粒度。</span></div>
-        <div class="read-step"><strong>3. 同時看風險 / Risk</strong><span>Generic Risk 和 validation issues 判斷是否需要人工複核。</span></div>
-        <div class="read-step"><strong>4. 最後看成本 / Cost</strong><span>成本/非風險 unit 比單純成本/Unit 更穩。</span></div>
+        <div class="read-step"><strong>1. 先看覆盖</strong><span>文件、非空会议、缺失会议决定比较是否公平。</span></div>
+        <div class="read-step"><strong>2. 再看产出</strong><span>Units 和 Codes/Unit 判断敏感度与编码粒度。</span></div>
+        <div class="read-step"><strong>3. 同时看风险</strong><span>Generic Risk 和 validation issues 判断是否需要人工复核。</span></div>
+        <div class="read-step"><strong>4. 最后看成本</strong><span>成本/非风险 unit 比单纯成本/Unit 更稳。</span></div>
       </div>
     </section>
 
     <section id="metric-framework">
-      ${sectionTitle("fa-sitemap", "模型選擇指標框架", "Metric framework for model choice")}
-      <p>建議不要只比較「誰產出更多」。更合理的做法是把模型行為拆成完整性、召回、邊界控制、粒度、成本效率與 prompt 穩定性六組指標。</p>
-      <p class="note">Do not select a model only by output volume. Evaluate completeness, recall, boundary control, granularity, cost efficiency, and prompt stability together.</p>
+      ${sectionTitle("fa-sitemap", "模型选择指标框架")}
+      <p>建议不要只比较“谁产出更多”。更合理的做法是把模型行为拆成完整性、召回、边界控制、粒度、成本效率与 prompt 稳定性六组指标。</p>
       ${metricFrameworkTable}
     </section>
 
     <section id="reading-guide">
-      ${sectionTitle("fa-book-open-reader", "怎麼讀這份報告", "How to read this report")}
-      <p class="note">滑鼠停留在帶問號的表頭上，可以看到指標解釋。下面是最容易誤讀的幾個點。 / Hover over question-mark headers for metric explanations.</p>
+      ${sectionTitle("fa-book-open-reader", "怎么读这份报告")}
+      <p class="note">鼠标停留在带问号的表头上，可以看到指标解释。下面是最容易误读的几个点。</p>
       ${guideTable}
     </section>
 
     <section id="method">
-      ${sectionTitle("fa-scale-balanced", "方法與口徑", "Method and definitions")}
+      ${sectionTitle("fa-scale-balanced", "方法与口径")}
       <p>比較分為 exact text、containment 和 fuzzy evidence 三層。fuzzy 使用 token Jaccard，閾值為 <code>${FUZZY_THRESHOLD}</code>。Label family 是輕量詞彙歸併，不等於最終語義 codebook。Boundary risk 也是詞彙風險提示，不是自動錯誤判定。</p>
       <p>成本按 OpenAI 官方價格頁計算：標準價每 1M tokens 為 GPT-5.5 $5/$30、GPT-5.4 $2.50/$15、GPT-5.4 mini $0.75/$4.50，Batch API 對輸入和輸出節省 50%。價格核對日期：${escapeHtml(pricingSource.checked_date)}；來源：<a href="${escapeHtml(pricingSource.official_url)}">${escapeHtml(pricingSource.official_url)}</a>。</p>
-      <p class="note">完整規範見 <code>analysis/model_comparison_spec.md</code>。所有 CSV/JSON 產物位於 <code>analysis/model_comparison/</code>。</p>
+      <p class="note">完整规范见 <code>analysis/model_comparison_spec.md</code>。所有 CSV/JSON 产物位于 <code>analysis/model_comparison/</code>。</p>
     </section>
 
     <section id="model-table">
-      ${sectionTitle("fa-table-columns", "模型層級對比", "Model-level comparison")}
+      ${sectionTitle("fa-table-columns", "模型级对比")}
       ${modelSummaryTable}
     </section>
 
     <section id="cost">
-      ${sectionTitle("fa-coins", "Batch API 成本效率", "Batch API cost efficiency")}
+      ${sectionTitle("fa-coins", "Batch API 成本效率")}
       <p class="note">成本來自 raw batch response 的真實 token usage，再套用官方標準價格與 Batch 50% 折扣。這裡沒有計入可能的稅費、區域處理 uplift、超長上下文 uplift 或項目級折扣。</p>
       ${costTable}
     </section>
 
     <section id="quality">
-      ${sectionTitle("fa-clipboard-check", "完整性與品質門檻", "Completeness and quality gates")}
+      ${sectionTitle("fa-clipboard-check", "完整性与质量门槛")}
       <p class="note">這些檢查只說明 batch 產物的可審計性，不直接判斷開放編碼的理論品質。code.text 不在 unit.text 說明證據摘錄沒有嚴格滿足 prompt 的 containment 要求，後續人工審計時應優先檢查。</p>
       ${validationTable}
-      <h3>缺失會議文件 / Missing meeting files</h3>
+      <h3>缺失会议文件</h3>
       ${missingTable}
     </section>
 
     <section id="prompt-audit">
-      ${sectionTitle("fa-pen-nib", "Prompt 設計評價", "Prompt design evaluation")}
+      ${sectionTitle("fa-pen-nib", "Prompt 设计评价")}
       <p>這些結果不能只解釋為模型能力差異。Prompt 本身規定了 AI 邊界、meaning-unit 切分、code 粒度、confidence 和 JSON 紀律；不同模型對這些規則的執行穩定性，也是比較的一部分。</p>
       <p class="note">這部分評價把結果指標反向映射到 prompt 設計，用來指導下一輪 prompt 改進；它不改變目前開放編碼結果。</p>
       ${promptAuditTable}
     </section>
 
     <section id="prompt-v2">
-      ${sectionTitle("fa-wand-magic-sparkles", "改進版 Prompt v2", "Improved prompt v2")}
+      ${sectionTitle("fa-wand-magic-sparkles", "改进版 Prompt v2")}
       <p>基於本次 prompt audit，我生成了一個可用於下一輪 batch 的改進版 open-coding prompt。它保留原 prompt 的 grounded-theory 和 evidence-first 結構，但更明確地處理邊界、切分、code 粒度和最終自檢。</p>
       ${promptV2SummaryTable}
       <p class="note">完整 prompt 文件：<a class="source-link" href="./${escapeHtml(improvedPrompt.filename)}" target="_blank" rel="noopener">${escapeHtml(improvedPrompt.filename)}</a></p>
       <details>
-        <summary>預覽改進版 prompt / Preview improved prompt</summary>
+        <summary>预览改进版 prompt</summary>
         <pre>${escapeHtml(improvedPrompt.content)}</pre>
       </details>
     </section>
 
     <section id="pairwise">
-      ${sectionTitle("fa-link", "Pairwise Evidence 重疊", "Pairwise evidence overlap")}
+      ${sectionTitle("fa-link", "Pairwise Evidence 重叠")}
       <p class="note">Exact 表示文本邊界完全一致；Containment 表示一個 unit 包含另一個；Fuzzy 表示詞彙重疊達到閾值。低 exact 不代表內容完全不同，常見原因是 batch 結果邊界切分不同。</p>
       ${pairSummaryTable}
     </section>
 
     <section id="consensus">
-      ${sectionTitle("fa-diagram-project", "Consensus 結構", "Consensus structure")}
+      ${sectionTitle("fa-diagram-project", "Consensus 结构")}
       <p><span class="pill">3-model: ${consensus.three_model_components}</span><span class="pill">2-model: ${consensus.two_model_components}</span><span class="pill">unique: ${consensus.one_model_components}</span></p>
       <p>三模型共識 evidence 更適合進入穩定 codebook；單模型獨有 evidence 則是發現增量洞見和邊界誤納入風險的主要審計對象。</p>
     </section>
 
     <section id="labels">
-      ${sectionTitle("fa-tags", "Label Family 高頻項", "Frequent label families")}
+      ${sectionTitle("fa-tags", "Label Family 高频项")}
       <p class="note">這些是可重複的詞彙歸併結果，用於發現近義標籤和 codebook 歸併壓力。開放編碼本身允許 label 高度分散。</p>
       ${familyTable}
     </section>
 
     <section id="boundary">
-      ${sectionTitle("fa-triangle-exclamation", "Boundary Risk 審計樣例", "Boundary-risk audit examples")}
+      ${sectionTitle("fa-triangle-exclamation", "Boundary Risk 审计样例")}
       <p class="note">以下優先展示 generic digital/data 風險片段。它們未必錯誤，但需要確認是否真的有本地 AI/ML/model-driven 語境支撐。</p>
       ${boundaryTable}
     </section>
 
     <section id="divergence">
-      ${sectionTitle("fa-arrows-left-right-to-line", "高分歧會議", "High-divergence meetings")}
+      ${sectionTitle("fa-arrows-left-right-to-line", "高分歧会议")}
       ${divergenceTable}
     </section>
 
     <section id="unique">
-      ${sectionTitle("fa-eye", "模型獨有 Evidence 樣例", "Model-unique evidence examples")}
+      ${sectionTitle("fa-eye", "模型独有 Evidence 样例")}
       <div class="cards">${uniqueCards}</div>
     </section>
 
     <section id="recommendations">
-      ${sectionTitle("fa-route", "實踐建議", "Practical recommendations")}
+      ${sectionTitle("fa-route", "实践建议")}
       ${recommendationTable}
       <p class="note">推薦工作流：以 5.5 的細粒度 codes 作為主材料，以 5.4 作為高召回補充，以 5.4mini 作為邊界壓力測試；對三模型共識 units 優先進入 axial coding，對單模型獨有且 generic digital risk 的 units 進行人工複核。</p>
       <p class="note">如果研究預算敏感，可以把成本效率加入決策：用 5.4mini 做大規模初篩，用 5.4 做召回補充，用 5.5 只處理高價值或高分歧會議。不過若目標是發表級 grounded coding，仍應優先看證據紀律和人工審計通過率。</p>
     </section>
 
     <section id="outputs">
-      ${sectionTitle("fa-folder-open", "輸出文件", "Output files")}
+      ${sectionTitle("fa-folder-open", "输出文件")}
       <ul>${outputFiles.map((file) => `<li><code>${escapeHtml(file)}</code></li>`).join("")}</ul>
     </section>
     </main>
   </div>
-  <script>
-    (function () {
-      const buttons = Array.from(document.querySelectorAll("[data-lang-toggle]"));
-      function setLanguage(mode) {
-        const next = ["zh", "en", "dual"].includes(mode) ? mode : "dual";
-        document.body.classList.remove("lang-zh", "lang-en", "lang-dual");
-        document.body.classList.add("lang-" + next);
-        document.documentElement.lang = next === "en" ? "en" : "zh-Hant";
-        buttons.forEach((button) => {
-          const active = button.dataset.langToggle === next;
-          button.classList.toggle("active", active);
-          button.setAttribute("aria-pressed", active ? "true" : "false");
-        });
-        try { window.localStorage.setItem("modelComparisonLanguage", next); } catch (_) {}
-      }
-      buttons.forEach((button) => button.addEventListener("click", () => setLanguage(button.dataset.langToggle)));
-      let saved = "dual";
-      try { saved = window.localStorage.getItem("modelComparisonLanguage") || "dual"; } catch (_) {}
-      setLanguage(saved);
-    }());
-  </script>
 </body>
 </html>`;
 }
