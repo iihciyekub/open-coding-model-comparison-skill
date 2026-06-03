@@ -1334,8 +1334,18 @@ function generateHtml(reportData) {
   const css = `
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; color: #182026; background: #f7f8fa; line-height: 1.55; }
     header { background: #12343b; color: white; padding: 38px 48px 30px; }
+    .header-bar { display: flex; gap: 20px; justify-content: space-between; align-items: flex-start; }
+    .header-copy { min-width: 0; }
     header h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
     header p { margin: 0; max-width: 980px; color: #dce8ea; }
+    .lang-switch { display: inline-flex; gap: 3px; padding: 4px; border: 1px solid rgba(255,255,255,.28); border-radius: 8px; background: rgba(255,255,255,.08); white-space: nowrap; }
+    .lang-switch button { border: 0; border-radius: 6px; background: transparent; color: #dce8ea; padding: 7px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+    .lang-switch button.active { background: #fff; color: #12343b; font-weight: 700; }
+    .lang-switch button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .en-copy { color: inherit; }
+    body.lang-zh .en-copy, body.lang-zh .dual-sep, body.lang-zh .bi .en { display: none; }
+    body.lang-en .zh-copy, body.lang-en .dual-sep, body.lang-en .bi .zh { display: none; }
+    body.lang-en .bi { display: inline-flex; }
     .page-shell { max-width: 1480px; margin: 0 auto; padding: 28px; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 20px; align-items: start; }
     main { min-width: 0; padding: 0 0 28px; }
     .side-nav { position: sticky; top: 18px; background: white; border: 1px solid #dfe5e8; border-radius: 8px; padding: 14px; max-height: calc(100vh - 36px); overflow: auto; }
@@ -1395,7 +1405,7 @@ function generateHtml(reportData) {
     .read-step { border-left: 4px solid #2f7d72; background: #f4faf8; padding: 12px; border-radius: 8px; }
     .read-step strong { display: block; color: #12343b; margin-bottom: 4px; }
     .read-step span { color: #52626b; font-size: 13px; }
-    @media (max-width: 900px) { .grid, .cards, .profile-grid { grid-template-columns: 1fr; } header { padding: 28px 22px; } .page-shell { display: block; padding: 18px; } .side-nav { position: static; max-height: none; margin-bottom: 18px; } .side-nav a { display: inline-flex; margin: 2px; } }
+    @media (max-width: 900px) { .grid, .cards, .profile-grid { grid-template-columns: 1fr; } header { padding: 28px 22px; } .header-bar { display: block; } .lang-switch { margin-top: 16px; } .page-shell { display: block; padding: 18px; } .side-nav { position: static; max-height: none; margin-bottom: 18px; } .side-nav a { display: inline-flex; margin: 2px; } }
     @media (max-width: 900px) { .read-path { grid-template-columns: 1fr; } }
   `;
 
@@ -1412,36 +1422,45 @@ function generateHtml(reportData) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>${css}</style>
 </head>
-<body>
+<body class="lang-dual">
   <header>
-    <h1>5.5 / 5.4 / 5.4mini Batch 開放編碼模型評估報告</h1>
-    <p>用一批隨機 benchmark 輸入評估同一 prompt、同一 Batch API 流程下不同模型的輸出差異、成本效率、可審計性、模型選擇指標與 prompt 改進方向。 / A benchmark-style evaluation of model behavior, cost efficiency, auditability, model-selection metrics, and prompt improvement under the same Batch API workflow. 生成時間 / Generated: ${escapeHtml(generated_at)}</p>
+    <div class="header-bar">
+      <div class="header-copy">
+        <h1><span class="zh-copy">5.5 / 5.4 / 5.4mini Batch 開放編碼模型評估報告</span><span class="en-copy">5.5 / 5.4 / 5.4mini Batch Open-Coding Model Evaluation Report</span></h1>
+        <p><span class="zh-copy">用一批隨機 benchmark 輸入評估同一 prompt、同一 Batch API 流程下不同模型的輸出差異、成本效率、可審計性、模型選擇指標與 prompt 改進方向。</span><span class="dual-sep"> / </span><span class="en-copy">A benchmark-style evaluation of model behavior, cost efficiency, auditability, model-selection metrics, and prompt improvement under the same Batch API workflow.</span> <span class="zh-copy">生成時間</span><span class="en-copy">Generated</span>: ${escapeHtml(generated_at)}</p>
+      </div>
+      <div class="lang-switch" role="group" aria-label="Language switch">
+        <button type="button" data-lang-toggle="zh">繁中</button>
+        <button type="button" data-lang-toggle="en">English</button>
+        <button type="button" data-lang-toggle="dual">對照</button>
+      </div>
+    </div>
   </header>
   <div class="page-shell">
     <nav class="side-nav" aria-label="報告導航 / Report navigation">
-      <h2>報告導航 / Nav</h2>
-      <a href="#summary"><i class="fa-solid fa-compass"></i>執行摘要 / Summary</a>
-      <a href="#purpose"><i class="fa-solid fa-bullseye"></i>評估目的 / Purpose</a>
-      <a href="#setup"><i class="fa-solid fa-flask"></i>Benchmark 設定 / Setup</a>
-      <a href="#profiles"><i class="fa-solid fa-id-card-clip"></i>模型畫像 / Profiles</a>
-      <a href="#scorecard"><i class="fa-solid fa-list-check"></i>選型 Scorecard</a>
-      <a href="#metrics"><i class="fa-solid fa-chart-simple"></i>關鍵指標 / Metrics</a>
-      <a href="#metric-framework"><i class="fa-solid fa-sitemap"></i>指標框架 / Framework</a>
-      <a href="#reading-guide"><i class="fa-solid fa-book-open-reader"></i>讀表指南 / Guide</a>
-      <a href="#method"><i class="fa-solid fa-scale-balanced"></i>方法口徑 / Method</a>
-      <a href="#model-table"><i class="fa-solid fa-table-columns"></i>模型對比 / Model table</a>
-      <a href="#cost"><i class="fa-solid fa-coins"></i>成本效率 / Cost</a>
-      <a href="#quality"><i class="fa-solid fa-clipboard-check"></i>品質門檻 / Quality</a>
-      <a href="#prompt-audit"><i class="fa-solid fa-pen-nib"></i>Prompt 評價</a>
+      <h2><span class="zh-copy">報告導航</span><span class="en-copy">Report nav</span></h2>
+      <a href="#summary"><i class="fa-solid fa-compass"></i><span class="zh-copy">執行摘要</span><span class="en-copy">Summary</span></a>
+      <a href="#purpose"><i class="fa-solid fa-bullseye"></i><span class="zh-copy">評估目的</span><span class="en-copy">Purpose</span></a>
+      <a href="#setup"><i class="fa-solid fa-flask"></i><span class="zh-copy">Benchmark 設定</span><span class="en-copy">Setup</span></a>
+      <a href="#profiles"><i class="fa-solid fa-id-card-clip"></i><span class="zh-copy">模型畫像</span><span class="en-copy">Profiles</span></a>
+      <a href="#scorecard"><i class="fa-solid fa-list-check"></i><span class="zh-copy">選型 Scorecard</span><span class="en-copy">Selection scorecard</span></a>
+      <a href="#metrics"><i class="fa-solid fa-chart-simple"></i><span class="zh-copy">關鍵指標</span><span class="en-copy">Metrics</span></a>
+      <a href="#metric-framework"><i class="fa-solid fa-sitemap"></i><span class="zh-copy">指標框架</span><span class="en-copy">Framework</span></a>
+      <a href="#reading-guide"><i class="fa-solid fa-book-open-reader"></i><span class="zh-copy">讀表指南</span><span class="en-copy">Guide</span></a>
+      <a href="#method"><i class="fa-solid fa-scale-balanced"></i><span class="zh-copy">方法口徑</span><span class="en-copy">Method</span></a>
+      <a href="#model-table"><i class="fa-solid fa-table-columns"></i><span class="zh-copy">模型對比</span><span class="en-copy">Model table</span></a>
+      <a href="#cost"><i class="fa-solid fa-coins"></i><span class="zh-copy">成本效率</span><span class="en-copy">Cost</span></a>
+      <a href="#quality"><i class="fa-solid fa-clipboard-check"></i><span class="zh-copy">品質門檻</span><span class="en-copy">Quality</span></a>
+      <a href="#prompt-audit"><i class="fa-solid fa-pen-nib"></i><span class="zh-copy">Prompt 評價</span><span class="en-copy">Prompt audit</span></a>
       <a href="#prompt-v2"><i class="fa-solid fa-wand-magic-sparkles"></i>Prompt v2</a>
-      <a href="#pairwise"><i class="fa-solid fa-link"></i>Evidence 重疊</a>
+      <a href="#pairwise"><i class="fa-solid fa-link"></i><span class="zh-copy">Evidence 重疊</span><span class="en-copy">Evidence overlap</span></a>
       <a href="#consensus"><i class="fa-solid fa-diagram-project"></i>Consensus</a>
       <a href="#labels"><i class="fa-solid fa-tags"></i>Label Family</a>
       <a href="#boundary"><i class="fa-solid fa-triangle-exclamation"></i>Boundary Risk</a>
-      <a href="#divergence"><i class="fa-solid fa-arrows-left-right-to-line"></i>高分歧會議</a>
-      <a href="#unique"><i class="fa-solid fa-eye"></i>獨有 Evidence</a>
-      <a href="#recommendations"><i class="fa-solid fa-route"></i>實踐建議 / Advice</a>
-      <a href="#outputs"><i class="fa-solid fa-folder-open"></i>輸出文件 / Outputs</a>
+      <a href="#divergence"><i class="fa-solid fa-arrows-left-right-to-line"></i><span class="zh-copy">高分歧會議</span><span class="en-copy">High divergence</span></a>
+      <a href="#unique"><i class="fa-solid fa-eye"></i><span class="zh-copy">獨有 Evidence</span><span class="en-copy">Unique evidence</span></a>
+      <a href="#recommendations"><i class="fa-solid fa-route"></i><span class="zh-copy">實踐建議</span><span class="en-copy">Advice</span></a>
+      <a href="#outputs"><i class="fa-solid fa-folder-open"></i><span class="zh-copy">輸出文件</span><span class="en-copy">Outputs</span></a>
     </nav>
     <main>
     <section id="summary">
@@ -1600,6 +1619,27 @@ function generateHtml(reportData) {
     </section>
     </main>
   </div>
+  <script>
+    (function () {
+      const buttons = Array.from(document.querySelectorAll("[data-lang-toggle]"));
+      function setLanguage(mode) {
+        const next = ["zh", "en", "dual"].includes(mode) ? mode : "dual";
+        document.body.classList.remove("lang-zh", "lang-en", "lang-dual");
+        document.body.classList.add("lang-" + next);
+        document.documentElement.lang = next === "en" ? "en" : "zh-Hant";
+        buttons.forEach((button) => {
+          const active = button.dataset.langToggle === next;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+        try { window.localStorage.setItem("modelComparisonLanguage", next); } catch (_) {}
+      }
+      buttons.forEach((button) => button.addEventListener("click", () => setLanguage(button.dataset.langToggle)));
+      let saved = "dual";
+      try { saved = window.localStorage.getItem("modelComparisonLanguage") || "dual"; } catch (_) {}
+      setLanguage(saved);
+    }());
+  </script>
 </body>
 </html>`;
 }

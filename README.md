@@ -1,6 +1,6 @@
 # Open Coding Model Comparison Skill
 
-Version: `0.1.0`
+Version: `0.1.1`
 
 Reusable Codex skill for comparing multiple Batch API grounded-theory open-coding result sets generated from the same input corpus and prompt.
 
@@ -8,7 +8,7 @@ The report is intended for model and prompt evaluation, not for substantive anal
 
 ## What It Produces
 
-- Bilingual Traditional Chinese/English HTML report
+- Bilingual Traditional Chinese/English HTML report with `繁中 / English / 對照` language switcher
 - Model-selection scorecard
 - Model profile cards
 - Evidence overlap and consensus metrics
