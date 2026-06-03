@@ -7,9 +7,9 @@ description: Compare multiple model outputs for grounded-theory open-coding batc
 
 ## Version
 
-Current version: `0.1.3`.
+Current version: `0.1.4`.
 
-This version packages the reusable comparison workflow for benchmark-style Batch API open-coding model evaluation. It includes the comparison script, a Chinese-first HTML report that keeps necessary English technical terms such as Batch API, prompt, evidence, Generic Risk, open codes, and codes/unit, Batch API cost-efficiency metrics, model-selection scorecard, prompt-design audit, improved prompt v2, and relative source links for human review.
+This version packages the reusable comparison workflow for benchmark-style Batch API open-coding model evaluation. It includes the comparison script, a Chinese-first HTML report that explicitly shows per-model Open codes counts as well as necessary English technical terms such as Batch API, prompt, evidence, Generic Risk, open codes, and codes/unit, Batch API cost-efficiency metrics, model-selection scorecard, prompt-design audit, improved prompt v2, and relative source links for human review.
 
 ## Purpose
 

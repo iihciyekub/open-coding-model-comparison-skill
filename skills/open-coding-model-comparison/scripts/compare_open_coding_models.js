@@ -1228,6 +1228,25 @@ function generateHtml(reportData) {
     selectionRows,
     (r) => [escapeHtml(r.dimension), escapeHtml(r.m55), escapeHtml(r.m54), escapeHtml(r.mini), escapeHtml(r.note)]
   );
+  const openCodeCountTable = table(
+    [
+      "模型",
+      tip("Meaning units", "模型选中的 evidence 片段数量，也就是开放编码的分析单元数量。"),
+      tip("Open codes 数量", "每个 meaning unit 的 codes[] 数组条目总和；这是 open coding 实际产出的 code 条目数。"),
+      tip("Open codes/Unit", "Open codes 数量除以 meaning units，用来判断编码粒度。"),
+      tip("Unique labels", "去重后的原始 open-code label 数量。"),
+      tip("Label families", "轻量词汇归并后的 label family 数量，用来估计 codebook 归并压力。")
+    ],
+    modelSummaries,
+    (r) => [
+      escapeHtml(r.model),
+      r.units,
+      r.codes,
+      num(r.avg_codes_per_unit),
+      r.unique_normalized_labels,
+      r.label_families
+    ]
+  );
   const promptAuditTable = table(
     [
       tip("Prompt 维度", "把模型差异映射回 prompt 设计：边界、切分、粒度、置信度、格式纪律等。"),
@@ -1325,7 +1344,8 @@ function generateHtml(reportData) {
         <div><h3>${escapeHtml(row.model)} · ${escapeHtml(meta.title)}</h3><p>${escapeHtml(meta.thesis)}</p></div>
       </div>
       <div class="profile-stats">
-        <div><strong>${row.units}</strong><span>Units</span></div>
+        <div><strong>${row.units}</strong><span>Meaning units</span></div>
+        <div><strong>${row.codes}</strong><span>Open codes 数量</span></div>
         <div><strong>${num(row.avg_codes_per_unit)}</strong><span>Open codes/Unit</span></div>
         <div><strong>$${num(row.estimated_batch_cost_usd, 2)}</strong><span>Batch 成本</span></div>
         <div><strong>${pct(row.generic_digital_risk_rate)}</strong><span>Generic Risk</span></div>
@@ -1488,6 +1508,9 @@ function generateHtml(reportData) {
         <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.label_families, 0)}</span><span class="label">Label families 合计</span></div>
         <div class="metric"><span class="value">${consensus.three_model_components}</span><span class="label">三模型共识 evidence clusters</span></div>
       </div>
+      <h3>各模型 Open codes 具体数量</h3>
+      <p class="note">这里的 Open codes 数量不是平均值，而是该模型所有输出 JSON 中 codes[] 条目的总和。</p>
+      ${openCodeCountTable}
       <div class="read-path">
         <div class="read-step"><strong>1. 先看覆盖</strong><span>文件、非空会议、缺失会议决定比较是否公平。</span></div>
         <div class="read-step"><strong>2. 再看产出</strong><span>Meaning units 看证据片段数量，Open codes 数量和 Open codes/Unit 看开放编码产出量与粒度。</span></div>
