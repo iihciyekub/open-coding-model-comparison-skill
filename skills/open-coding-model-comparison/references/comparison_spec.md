@@ -374,6 +374,15 @@ The final report should be a standalone HTML file that includes:
 
 The report should not present lexical risk flags as definitive qualitative truth. It should clearly separate measured differences from interpretive conclusions.
 
+The report should include a provenance section that states:
+
+- generating skill name
+- skill GitHub URL
+- skill version
+- input origin URL: `https://iiaide.com/gt/`
+- input origin note: iiaide GT opencoding flow final process ZIP package
+- expected extracted data structure, shown in a collapsed `<details>` block by default
+
 ## Interpretation Framework
 
 Use the following language in the report:

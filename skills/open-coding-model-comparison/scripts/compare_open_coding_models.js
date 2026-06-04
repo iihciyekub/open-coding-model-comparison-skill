@@ -57,6 +57,21 @@ const RESULTS_DIR = CLI.resultsDir ? path.resolve(CLI.resultsDir) : path.join(RO
 const OUT_DIR = CLI.outDir ? path.resolve(CLI.outDir) : path.join(ROOT, "analysis", "model_comparison");
 const FUZZY_THRESHOLD = Number(CLI.fuzzyThreshold);
 const PROMPT_V2_FILENAME = "improved_open_coding_prompt_v2.md";
+const SKILL_PROVENANCE = {
+  name: "open-coding-model-comparison",
+  version: "0.1.6",
+  github_url: "https://github.com/iihciyekub/open-coding-model-comparison-skill",
+  skill_path: "skills/open-coding-model-comparison",
+  input_origin_url: "https://iiaide.com/gt/",
+  input_origin_description: "Generated from the iiaide GT opencoding flow final process ZIP package, then extracted into the expected results/<model>/... project layout.",
+  data_structure: [
+    "results/<model>/01_companies/company_<companyid>/02_open_coding/<keydevid>.json",
+    "results/<model>/09_logs/raw_batch_responses/**/<companyid>_<keydevid>.json",
+    "analysis/model_comparison/model_comparison_report.html",
+    "analysis/model_comparison/*.csv",
+    "analysis/model_comparison/report_data.json"
+  ]
+};
 const PRICING_SOURCE = {
   checked_date: "2026-06-03",
   official_url: "https://openai.com/api/pricing/",
@@ -1453,10 +1468,26 @@ function sectionTitle(icon, title) {
 }
 
 function generateHtml(reportData) {
-  const { generated_at, pricingSource, benchmarkInputSummary, benchmarkModelRequests, modelSummaries, pairSummaries, consensus, labelRows, semantic, boundaryExamples, disagreementExamples, promptAuditRows, improvedPrompt, outputFiles } = reportData;
+  const { generated_at, skillProvenance, pricingSource, benchmarkInputSummary, benchmarkModelRequests, modelSummaries, pairSummaries, consensus, labelRows, semantic, boundaryExamples, disagreementExamples, promptAuditRows, improvedPrompt, outputFiles } = reportData;
   const topFamilies = labelRows.slice(0, 15);
   const topCanonicalCodes = (semantic?.canonicalCodebookRows || []).slice().sort((a, b) => b.total_codes - a.total_codes).slice(0, 15);
   const summaryValue = (metric) => benchmarkInputSummary?.find((row) => row.metric === metric)?.value ?? 0;
+  const provenanceRows = [
+    { field: "Skill", value: skillProvenance?.name || "" },
+    { field: "Skill version", value: skillProvenance?.version || "" },
+    { field: "GitHub", value: `<a href="${htmlAttr(skillProvenance?.github_url || "")}" target="_blank" rel="noopener">${escapeHtml(skillProvenance?.github_url || "")}</a>` },
+    { field: "Skill path", value: escapeHtml(skillProvenance?.skill_path || "") },
+    { field: "Input origin", value: `<a href="${htmlAttr(skillProvenance?.input_origin_url || "")}" target="_blank" rel="noopener">${escapeHtml(skillProvenance?.input_origin_url || "")}</a>` },
+    { field: "Input process", value: escapeHtml(skillProvenance?.input_origin_description || "") }
+  ];
+  const provenanceTable = table(
+    ["字段", "值"],
+    provenanceRows,
+    (r) => [escapeHtml(r.field), r.value]
+  );
+  const dataStructurePreview = (skillProvenance?.data_structure || [])
+    .map((line) => `<li><code>${escapeHtml(line)}</code></li>`)
+    .join("");
   const benchmarkSummaryTable = table(
     [
       tip("指标", "用于说明这批 benchmark 输入和 Batch 输出的基本规模。"),
@@ -2005,6 +2036,7 @@ function generateHtml(reportData) {
       <a href="#summary"><i class="fa-solid fa-compass"></i>执行摘要</a>
       <a href="#purpose"><i class="fa-solid fa-bullseye"></i>评估目的</a>
       <a href="#setup"><i class="fa-solid fa-flask"></i>Benchmark 设置</a>
+      <a href="#provenance"><i class="fa-solid fa-code-branch"></i>报告来源</a>
       <a href="#profiles"><i class="fa-solid fa-id-card-clip"></i>模型画像</a>
       <a href="#scorecard"><i class="fa-solid fa-list-check"></i>模型选择 Scorecard</a>
       <a href="#metrics"><i class="fa-solid fa-chart-simple"></i>关键指标</a>
@@ -2058,6 +2090,17 @@ function generateHtml(reportData) {
       ${benchmarkSummaryTable}
       <h3>各模型请求与输出覆盖</h3>
       ${benchmarkRequestTable}
+    </section>
+
+    <section id="provenance">
+      ${sectionTitle("fa-code-branch", "报告来源与数据结构")}
+      <p class="note">这一节记录报告是由哪个 skill、哪个版本、基于什么输入流程生成的，方便后续复现和审计。</p>
+      ${provenanceTable}
+      <details>
+        <summary>数据结构格式 / Data structure format</summary>
+        <p class="note">当前 skill 默认读取 iiaide GT opencoding flow 最后 process 产出的 ZIP 包解压后形成的结果目录；核心结构如下。</p>
+        <ul>${dataStructurePreview}</ul>
+      </details>
     </section>
 
     <section id="profiles">
@@ -2390,6 +2433,7 @@ async function main() {
     models: MODELS,
     fuzzy_threshold: FUZZY_THRESHOLD,
     pricingSource: PRICING_SOURCE,
+    skillProvenance: SKILL_PROVENANCE,
     benchmarkInputSummary,
     benchmarkModelRequests,
     modelSummaries,

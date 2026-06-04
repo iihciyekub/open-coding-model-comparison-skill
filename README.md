@@ -1,6 +1,6 @@
 # Open Coding Model Comparison Skill
 
-Version: `0.1.5`
+Version: `0.1.6`
 
 Reusable Codex skill for comparing multiple Batch API grounded-theory open-coding result sets generated from the same input corpus and prompt.
 
@@ -10,6 +10,7 @@ The report is intended for model and prompt evaluation, not for substantive anal
 
 - Chinese-first HTML report with per-model Open codes counts and necessary English technical terms such as Batch API, prompt, evidence, Generic Risk, open codes, and codes/unit
 - Benchmark input/request summary, including company count, meeting count, expected model-meeting requests, collected outputs, empty outputs, token usage, and estimated Batch cost
+- Report provenance with skill name, GitHub URL, version, iiaide GT opencoding flow input-origin note, and collapsed data-structure format
 - Model-selection scorecard
 - Model profile cards
 - Evidence overlap and consensus metrics
