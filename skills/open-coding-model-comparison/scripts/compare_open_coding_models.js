@@ -1501,9 +1501,9 @@ function generateHtml(reportData) {
     },
     {
       icon: "fa-folder-tree",
-      label: "Skill Path",
+      label: "Repo Skill Path",
       value: skillProvenance?.skill_path || "",
-      detail: "Local folder containing SKILL.md, script, and references."
+      detail: "Folder inside the public GitHub repository; analysis projects do not need a duplicate local skills/ copy."
     }
   ].map((item) => `<article class="provenance-card" tabindex="0" data-tip="${htmlAttr(item.detail)}">
     <span class="provenance-icon"><i class="fa-solid ${escapeHtml(item.icon)}"></i></span>
