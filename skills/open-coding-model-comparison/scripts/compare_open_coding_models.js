@@ -1467,27 +1467,77 @@ function sectionTitle(icon, title) {
   return `<h2 class="section-title"><i class="fa-solid ${escapeHtml(icon)}"></i>${bi(title)}</h2>`;
 }
 
+function treeNode(icon, label, detail, children = []) {
+  const childHtml = children.length ? `<ul>${children.join("")}</ul>` : "";
+  return `<li>
+    <span class="tree-item" tabindex="0" data-tip="${htmlAttr(detail)}"><i class="fa-solid ${escapeHtml(icon)}"></i><span>${escapeHtml(label)}</span></span>
+    ${childHtml}
+  </li>`;
+}
+
 function generateHtml(reportData) {
   const { generated_at, skillProvenance, pricingSource, benchmarkInputSummary, benchmarkModelRequests, modelSummaries, pairSummaries, consensus, labelRows, semantic, boundaryExamples, disagreementExamples, promptAuditRows, improvedPrompt, outputFiles } = reportData;
   const topFamilies = labelRows.slice(0, 15);
   const topCanonicalCodes = (semantic?.canonicalCodebookRows || []).slice().sort((a, b) => b.total_codes - a.total_codes).slice(0, 15);
   const summaryValue = (metric) => benchmarkInputSummary?.find((row) => row.metric === metric)?.value ?? 0;
-  const provenanceRows = [
-    { field: "Skill", value: skillProvenance?.name || "" },
-    { field: "Skill version", value: skillProvenance?.version || "" },
-    { field: "GitHub", value: `<a href="${htmlAttr(skillProvenance?.github_url || "")}" target="_blank" rel="noopener">${escapeHtml(skillProvenance?.github_url || "")}</a>` },
-    { field: "Skill path", value: escapeHtml(skillProvenance?.skill_path || "") },
-    { field: "Input origin", value: `<a href="${htmlAttr(skillProvenance?.input_origin_url || "")}" target="_blank" rel="noopener">${escapeHtml(skillProvenance?.input_origin_url || "")}</a>` },
-    { field: "Input process", value: escapeHtml(skillProvenance?.input_origin_description || "") }
-  ];
-  const provenanceTable = table(
-    ["字段", "值"],
-    provenanceRows,
-    (r) => [escapeHtml(r.field), r.value]
-  );
-  const dataStructurePreview = (skillProvenance?.data_structure || [])
-    .map((line) => `<li><code>${escapeHtml(line)}</code></li>`)
-    .join("");
+  const provenanceCards = [
+    {
+      icon: "fa-screwdriver-wrench",
+      label: "Skill",
+      value: skillProvenance?.name || "",
+      detail: `Version ${skillProvenance?.version || ""}`
+    },
+    {
+      icon: "fa-code-branch",
+      label: "GitHub",
+      value: `<a class="source-link" href="${htmlAttr(skillProvenance?.github_url || "")}" target="_blank" rel="noopener">${escapeHtml(skillProvenance?.github_url || "")}</a>`,
+      detail: "Public repository for this reusable Codex skill."
+    },
+    {
+      icon: "fa-diagram-project",
+      label: "Input Flow",
+      value: `<a class="source-link" href="${htmlAttr(skillProvenance?.input_origin_url || "")}" target="_blank" rel="noopener">iiaide GT opencoding flow</a>`,
+      detail: "Final process ZIP package extracted into the expected results layout."
+    },
+    {
+      icon: "fa-folder-tree",
+      label: "Skill Path",
+      value: skillProvenance?.skill_path || "",
+      detail: "Local folder containing SKILL.md, script, and references."
+    }
+  ].map((item) => `<article class="provenance-card" tabindex="0" data-tip="${htmlAttr(item.detail)}">
+    <span class="provenance-icon"><i class="fa-solid ${escapeHtml(item.icon)}"></i></span>
+    <div><span>${escapeHtml(item.label)}</span><strong>${item.value}</strong></div>
+  </article>`).join("");
+  const dataStructureTree = `<div class="structure-tree" aria-label="Expected data structure">
+    <ul>
+      ${treeNode("fa-folder", "project root", "Run the skill from the extracted benchmark project root.", [
+        treeNode("fa-folder", "results/", "Model result directories produced by the iiaide GT opencoding flow final process ZIP.", [
+          treeNode("fa-folder", "<model>/", "One folder per compared model, for example 5.5, 5.4, and 5.4mini.", [
+            treeNode("fa-folder", "01_companies/", "Company-scoped open-coding outputs.", [
+              treeNode("fa-folder", "company_<companyid>/", "One company directory, using the companyid from the source benchmark.", [
+                treeNode("fa-folder-open", "02_open_coding/", "Per-meeting open-coding JSON files read by this comparison skill.", [
+                  treeNode("fa-file-code", "<keydevid>.json", "Authoritative per-meeting open-coding JSON array. Each unit contains text, confidence, and codes[].")
+                ])
+              ])
+            ]),
+            treeNode("fa-folder", "09_logs/", "Optional raw Batch API logs for token usage and cost calculation.", [
+              treeNode("fa-folder-open", "raw_batch_responses/**/", "Nested raw response folders from the Batch collection process.", [
+                treeNode("fa-file-code", "<companyid>_<keydevid>.json", "Raw Batch response JSON. The script reads usage tokens when present.")
+              ])
+            ])
+          ])
+        ]),
+        treeNode("fa-folder", "analysis/", "Generated comparison outputs. The skill creates this directory if needed.", [
+          treeNode("fa-folder-open", "model_comparison/", "Canonical output folder for this report run.", [
+            treeNode("fa-file-lines", "model_comparison_report.html", "Canonical readable report. PDF is intentionally not generated."),
+            treeNode("fa-file-csv", "*.csv", "Metric tables, request summaries, semantic canonicalization tables, and audit tables."),
+            treeNode("fa-file-code", "report_data.json", "Structured report payload. Includes timestamps, so it is not part of deterministic checksum checks.")
+          ])
+        ])
+      ])}
+    </ul>
+  </div>`;
   const benchmarkSummaryTable = table(
     [
       tip("指标", "用于说明这批 benchmark 输入和 Batch 输出的基本规模。"),
@@ -1988,6 +2038,22 @@ function generateHtml(reportData) {
     .profile-use, .profile-risk { margin: 8px 0 0; font-size: 13px; }
     .profile-use i { color: #1d6154; }
     .profile-risk i { color: #9b5c1a; }
+    .provenance-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+    .provenance-card { position: relative; display: flex; align-items: flex-start; gap: 10px; border: 1px solid #dfe5e8; background: #fbfcfd; border-radius: 8px; padding: 12px; min-width: 0; }
+    .provenance-card span { color: #64727b; font-size: 12px; }
+    .provenance-card strong { display: block; margin-top: 3px; color: #12343b; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+    .provenance-icon { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: #e6f2ef; color: #1d6154; }
+    .structure-tree { margin-top: 10px; padding: 10px 10px 10px 4px; border: 1px solid #dfe5e8; border-radius: 8px; background: #fbfcfd; overflow: auto; }
+    .structure-tree ul { list-style: none; margin: 0; padding-left: 18px; position: relative; }
+    .structure-tree ul ul::before { content: ""; position: absolute; left: 7px; top: 0; bottom: 9px; border-left: 1px solid #cbd7dc; }
+    .structure-tree li { position: relative; margin: 3px 0; }
+    .structure-tree li::before { content: ""; position: absolute; left: -11px; top: 13px; width: 10px; border-top: 1px solid #cbd7dc; }
+    .structure-tree > ul > li::before { display: none; }
+    .tree-item { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 4px 7px; border-radius: 7px; font-size: 12px; white-space: nowrap; color: #203038; }
+    .tree-item i { color: #2f7d72; width: 14px; text-align: center; }
+    .tree-item:hover, .tree-item:focus { background: #edf3f5; outline: none; }
+    .tree-item::after, .provenance-card::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 7px); z-index: 7; width: min(340px, 76vw); padding: 9px 10px; border-radius: 8px; background: #12343b; color: white; box-shadow: 0 8px 24px rgba(18, 52, 59, 0.22); white-space: normal; line-height: 1.4; font-size: 12px; opacity: 0; pointer-events: none; transform: translateY(-3px); transition: opacity 120ms ease, transform 120ms ease; }
+    .tree-item:hover::after, .tree-item:focus::after, .provenance-card:hover::after, .provenance-card:focus::after { opacity: 1; transform: translateY(0); }
     .model-card { margin: 0; padding: 16px; }
     .example { border-top: 1px solid #e5eaed; padding-top: 10px; margin-top: 10px; }
     .example p { margin: 6px 0; font-size: 13px; }
@@ -2008,7 +2074,7 @@ function generateHtml(reportData) {
     .read-step { border-left: 4px solid #2f7d72; background: #f4faf8; padding: 12px; border-radius: 8px; }
     .read-step strong { display: block; color: #12343b; margin-bottom: 4px; }
     .read-step span { color: #52626b; font-size: 13px; }
-    @media (max-width: 900px) { .grid, .cards, .profile-grid { grid-template-columns: 1fr; } header { padding: 28px 22px; } .page-shell { display: block; padding: 18px; } .side-nav { position: static; max-height: none; margin-bottom: 18px; } .side-nav a { display: inline-flex; margin: 2px; } }
+    @media (max-width: 900px) { .grid, .cards, .profile-grid, .provenance-grid { grid-template-columns: 1fr; } header { padding: 28px 22px; } .page-shell { display: block; padding: 18px; } .side-nav { position: static; max-height: none; margin-bottom: 18px; } .side-nav a { display: inline-flex; margin: 2px; } }
     @media (max-width: 900px) { .read-path { grid-template-columns: 1fr; } }
   `;
 
@@ -2033,10 +2099,10 @@ function generateHtml(reportData) {
   <div class="page-shell">
     <nav class="side-nav" aria-label="报告导航">
       <h2>报告导航</h2>
+      <a href="#provenance"><i class="fa-solid fa-code-branch"></i>报告来源</a>
       <a href="#summary"><i class="fa-solid fa-compass"></i>执行摘要</a>
       <a href="#purpose"><i class="fa-solid fa-bullseye"></i>评估目的</a>
       <a href="#setup"><i class="fa-solid fa-flask"></i>Benchmark 设置</a>
-      <a href="#provenance"><i class="fa-solid fa-code-branch"></i>报告来源</a>
       <a href="#profiles"><i class="fa-solid fa-id-card-clip"></i>模型画像</a>
       <a href="#scorecard"><i class="fa-solid fa-list-check"></i>模型选择 Scorecard</a>
       <a href="#metrics"><i class="fa-solid fa-chart-simple"></i>关键指标</a>
@@ -2059,6 +2125,17 @@ function generateHtml(reportData) {
       <a href="#outputs"><i class="fa-solid fa-folder-open"></i>输出文件</a>
     </nav>
     <main>
+    <section id="provenance">
+      ${sectionTitle("fa-code-branch", "报告来源与数据结构")}
+      <p class="note">这一节记录报告是由哪个 skill、哪个版本、基于什么输入流程生成的，方便后续复现和审计。</p>
+      <div class="provenance-grid">${provenanceCards}</div>
+      <details>
+        <summary>数据结构格式 / Data structure format</summary>
+        <p class="note">当前 skill 默认读取 iiaide GT opencoding flow 最后 process 产出的 ZIP 包解压后形成的结果目录；核心结构如下。鼠标停在节点上可查看说明。</p>
+        ${dataStructureTree}
+      </details>
+    </section>
+
     <section id="summary">
       ${sectionTitle("fa-compass", "执行摘要")}
       <p>这份报告不分析这批输入资料的实质内容，而是把它当作 benchmark，用来评估 Batch API 下不同模型作为开放编码器的行为差异。</p>
@@ -2090,17 +2167,6 @@ function generateHtml(reportData) {
       ${benchmarkSummaryTable}
       <h3>各模型请求与输出覆盖</h3>
       ${benchmarkRequestTable}
-    </section>
-
-    <section id="provenance">
-      ${sectionTitle("fa-code-branch", "报告来源与数据结构")}
-      <p class="note">这一节记录报告是由哪个 skill、哪个版本、基于什么输入流程生成的，方便后续复现和审计。</p>
-      ${provenanceTable}
-      <details>
-        <summary>数据结构格式 / Data structure format</summary>
-        <p class="note">当前 skill 默认读取 iiaide GT opencoding flow 最后 process 产出的 ZIP 包解压后形成的结果目录；核心结构如下。</p>
-        <ul>${dataStructurePreview}</ul>
-      </details>
     </section>
 
     <section id="profiles">
