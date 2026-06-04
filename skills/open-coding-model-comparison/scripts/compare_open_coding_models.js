@@ -86,6 +86,75 @@ const STOPWORDS = new Set([
   "enabling", "drive", "driving", "support", "supporting", "expand", "expanding"
 ]);
 
+const SEMANTIC_STOPWORDS = new Set([
+  ...STOPWORDS,
+  "advance", "advancing", "adopt", "adopting", "add", "adding", "create", "creating",
+  "enhance", "enhancing", "implement", "implementing", "integrate", "integrating",
+  "leverage", "leveraging", "offer", "offering", "provide", "providing", "scale",
+  "scaling", "strengthen", "strengthening", "utilize", "utilizing"
+]);
+
+const SEMANTIC_SYNONYMS = new Map([
+  ["ais", "ai"],
+  ["artificial", "ai"],
+  ["intelligence", "ai"],
+  ["generative", "genai"],
+  ["llms", "llm"],
+  ["models", "model"],
+  ["modeling", "model"],
+  ["modelling", "model"],
+  ["analytics", "analytic"],
+  ["algorithmic", "algorithm"],
+  ["algorithms", "algorithm"],
+  ["automated", "automation"],
+  ["automating", "automation"],
+  ["capabilities", "capability"],
+  ["capabilitie", "capability"],
+  ["centers", "center"],
+  ["centres", "center"],
+  ["customers", "customer"],
+  ["development", "develop"],
+  ["developments", "develop"],
+  ["deployment", "deploy"],
+  ["deployments", "deploy"],
+  ["discover", "discovery"],
+  ["efficiencies", "efficiency"],
+  ["functions", "function"],
+  ["improv", "improve"],
+  ["improving", "improve"],
+  ["insights", "insight"],
+  ["licenses", "license"],
+  ["licensing", "license"],
+  ["licens", "license"],
+  ["platforms", "platform"],
+  ["products", "product"],
+  ["programs", "program"],
+  ["recurr", "recurring"],
+  ["revenues", "revenue"],
+  ["services", "service"],
+  ["solutions", "solution"],
+  ["technologies", "technology"],
+  ["transportables", "transportable"],
+  ["verticals", "vertical"]
+]);
+
+const SEMANTIC_PHRASES = [
+  { re: /\bartificial intelligence\b/g, token: "ai" },
+  { re: /\bgenerative ai\b/g, token: "genai" },
+  { re: /\bmachine learning\b/g, token: "ml" },
+  { re: /\bdeep learning\b/g, token: "deep_learning" },
+  { re: /\blarge language models?\b/g, token: "llm" },
+  { re: /\bfoundation models?\b/g, token: "foundation_model" },
+  { re: /\bnatural language processing\b/g, token: "nlp" },
+  { re: /\bcomputer vision\b/g, token: "computer_vision" },
+  { re: /\bdata centers?\b/g, token: "data_center" },
+  { re: /\bdata centres?\b/g, token: "data_center" },
+  { re: /\bdrug discovery\b/g, token: "drug_discovery" },
+  { re: /\brecurring revenue\b/g, token: "recurring_revenue" },
+  { re: /\buse cases?\b/g, token: "use_case" },
+  { re: /\bcustomer service\b/g, token: "customer_service" }
+];
+
 const EXPLICIT_AI_RE = /\b(artificial intelligence|generative ai|genai|machine learning|deep learning|large language model|foundation model|neural network|computer vision|natural language processing|ai agents?|llms?|ai|ml|nlp|model training|training models?|inference|ai chips?|ai accelerators?)\b/i;
 const POSSIBLE_AI_TECH_RE = /\b(predictive models?|prediction models?|recommendation systems?|personalization|speech recognition|image recognition|recognition models?|algorithmic decision|optimization models?|autonomous systems?|model-driven|intelligent decision)\b/i;
 const GENERIC_DIGITAL_RE = /\b(digital|data-driven|data driven|analytics?|cloud|automation|automated|crm|software|e-commerce|platforms?|data centers?|data centre|big data|algorithm|algorithms|tools?|technology|technologies|digitization|digitalization)\b/i;
@@ -241,6 +310,46 @@ function labelFamily(label) {
   return unique.join(" ") || normalizeLoose(label);
 }
 
+function semanticTokens(s) {
+  let text = String(s ?? "").toLowerCase();
+  for (const phrase of SEMANTIC_PHRASES) {
+    text = text.replace(phrase.re, ` ${phrase.token} `);
+  }
+  const tokens = normalizeLoose(text)
+    .split(" ")
+    .filter(Boolean)
+    .map(simpleStem)
+    .map((tok) => SEMANTIC_SYNONYMS.get(tok) || tok)
+    .filter((tok) => tok.length > 1 && !SEMANTIC_STOPWORDS.has(tok));
+  return [...new Set(tokens)];
+}
+
+function semanticSignature(label) {
+  const tokens = semanticTokens(label).sort();
+  return tokens.join(" ") || normalizeLoose(label);
+}
+
+function codeSemanticTokens(code) {
+  return new Set(semanticTokens(`${code.label} ${code.text} ${code.rationale}`));
+}
+
+function semanticCodeSimilarity(a, b) {
+  const labelScore = jaccard(new Set(semanticTokens(a.label)), new Set(semanticTokens(b.label)));
+  const combinedScore = jaccard(codeSemanticTokens(a), codeSemanticTokens(b));
+  return { labelScore, combinedScore };
+}
+
+function isSemanticCodeMatch(a, b, sameEvidenceCluster = false) {
+  const aNorm = a.normLabel || a.normalized_label;
+  const bNorm = b.normLabel || b.normalized_label;
+  if (aNorm && aNorm === bNorm) return true;
+  if (a.semantic_signature && a.semantic_signature === b.semantic_signature) return true;
+  const { labelScore, combinedScore } = semanticCodeSimilarity(a, b);
+  if (labelScore >= 0.6) return true;
+  if (sameEvidenceCluster && (labelScore >= 0.45 || combinedScore >= 0.5)) return true;
+  return false;
+}
+
 function evidenceClass(text) {
   if (EXPLICIT_AI_RE.test(text)) return "explicit_ai";
   if (POSSIBLE_AI_TECH_RE.test(text)) return "possible_ai_technical";
@@ -394,6 +503,7 @@ async function loadModel(model) {
         label: String(code?.label ?? ""),
         normLabel: normalizeLoose(code?.label ?? ""),
         family: labelFamily(code?.label ?? ""),
+        semantic_signature: semanticSignature(code?.label ?? ""),
         rationale: String(code?.rationale ?? "")
       })) : [];
       const text = String(unit?.text ?? "");
@@ -627,6 +737,44 @@ function costEfficiencyRows(modelSummaries) {
   }));
 }
 
+function benchmarkInputSummaryRows(modelSummaries, allMeetingKeys) {
+  const companyIds = new Set([...allMeetingKeys].map((key) => key.split(":")[0]));
+  const expectedRequests = allMeetingKeys.size * MODELS.length;
+  const totalOutputFiles = modelSummaries.reduce((sum, row) => sum + row.output_files, 0);
+  const totalUsageRecords = modelSummaries.reduce((sum, row) => sum + row.usage_records, 0);
+  const totalMissing = modelSummaries.reduce((sum, row) => sum + row.missing_files_vs_union, 0);
+  return [
+    { metric: "model_count", value: MODELS.length, note: MODELS.join("|") },
+    { metric: "company_count", value: companyIds.size, note: "Unique company IDs in the union of compared output files." },
+    { metric: "meeting_count", value: allMeetingKeys.size, note: "Unique companyid:keydevid meetings in the union of compared output files." },
+    { metric: "expected_model_meeting_requests", value: expectedRequests, note: "model_count x meeting_count; the paired benchmark target before missing outputs." },
+    { metric: "collected_output_files", value: totalOutputFiles, note: "Open-coding JSON files found across all model result directories." },
+    { metric: "missing_outputs_vs_expected", value: totalMissing, note: "Expected model-meeting outputs not found relative to the union benchmark." },
+    { metric: "usage_records", value: totalUsageRecords, note: "Raw Batch API response usage records found and used for token/cost summaries." },
+    { metric: "empty_json_outputs", value: modelSummaries.reduce((sum, row) => sum + row.empty_files, 0), note: "Valid JSON arrays with no meaning units." },
+    { metric: "nonempty_json_outputs", value: modelSummaries.reduce((sum, row) => sum + row.nonempty_files, 0), note: "JSON outputs containing at least one meaning unit." },
+    { metric: "input_tokens", value: modelSummaries.reduce((sum, row) => sum + row.input_tokens, 0), note: "Total input tokens from available usage records." },
+    { metric: "output_tokens", value: modelSummaries.reduce((sum, row) => sum + row.output_tokens, 0), note: "Total output tokens from available usage records." },
+    { metric: "estimated_batch_cost_usd", value: modelSummaries.reduce((sum, row) => sum + row.estimated_batch_cost_usd, 0), note: "Estimated cost from available usage records and Batch pricing assumptions." }
+  ];
+}
+
+function benchmarkModelRequestRows(modelSummaries, allMeetingKeys) {
+  return modelSummaries.map((row) => ({
+    model: row.model,
+    expected_requests: allMeetingKeys.size,
+    collected_output_files: row.output_files,
+    missing_outputs: row.missing_files_vs_union,
+    usage_records: row.usage_records,
+    empty_outputs: row.empty_files,
+    nonempty_outputs: row.nonempty_files,
+    companies: row.company_count,
+    input_tokens: row.input_tokens,
+    output_tokens: row.output_tokens,
+    estimated_batch_cost_usd: row.estimated_batch_cost_usd
+  }));
+}
+
 function promptDesignAuditRows(modelSummaries, pairSummaries, consensusCounts) {
   const totalComponents = Math.max(consensusCounts.components || 0, 1);
   const consensusRate = (consensusCounts.three_model_components || 0) / totalComponents;
@@ -852,6 +1000,8 @@ function buildConsensus(modelDataByName, allMeetingKeys) {
     one_model_components: 0
   };
   const uniqueUnits = [];
+  const unitToEvidenceCluster = new Map();
+  const evidenceClusterRows = [];
   for (const meetingKey of allMeetingKeys) {
     const units = [];
     for (const model of MODELS) {
@@ -877,6 +1027,21 @@ function buildConsensus(modelDataByName, allMeetingKeys) {
     for (const component of components.values()) {
       const modelSet = new Set(component.map((unit) => unit.model));
       consensusCounts.components += 1;
+      const evidenceClusterId = `EVC_${String(consensusCounts.components).padStart(5, "0")}`;
+      component.forEach((unit) => unitToEvidenceCluster.set(unit.globalUnitId, evidenceClusterId));
+      const first = component[0];
+      evidenceClusterRows.push({
+        evidence_cluster_id: evidenceClusterId,
+        companyid: first.companyid,
+        keydevid: first.keydevid,
+        meeting_key: first.meetingKey,
+        model_count: modelSet.size,
+        models_present: [...modelSet].sort().join("|"),
+        unit_count: component.length,
+        unit_ids: component.map((unit) => `${unit.model}:${unit.unit_id}`).join("|"),
+        evidence_class_set: [...new Set(component.map((unit) => unit.evidence_class))].sort().join("|"),
+        sample_text: component.sort((a, b) => a.words - b.words)[0]?.text || ""
+      });
       if (modelSet.size === 3) consensusCounts.three_model_components += 1;
       else if (modelSet.size === 2) consensusCounts.two_model_components += 1;
       else {
@@ -885,7 +1050,7 @@ function buildConsensus(modelDataByName, allMeetingKeys) {
       }
     }
   }
-  return { consensusCounts, uniqueUnits };
+  return { consensusCounts, uniqueUnits, unitToEvidenceCluster, evidenceClusterRows };
 }
 
 function labelFamilyRows(modelDataByName) {
@@ -921,6 +1086,287 @@ function labelFamilyRows(modelDataByName) {
       sample_labels: [...row.sample_labels].join(" | ")
     }))
     .sort((a, b) => b.total_codes - a.total_codes || b.model_count - a.model_count);
+}
+
+function chooseCanonicalLabel(codes) {
+  const counts = new Map();
+  for (const code of codes) {
+    const key = code.normLabel || code.normalized_label || normalizeLoose(code.label);
+    if (!key) continue;
+    if (!counts.has(key)) counts.set(key, { count: 0, labels: [] });
+    counts.get(key).count += 1;
+    counts.get(key).labels.push(code.label);
+  }
+  const candidates = [...counts.entries()]
+    .sort((a, b) => b[1].count - a[1].count || a[0].length - b[0].length);
+  if (!candidates.length) return codes[0]?.semantic_signature || "";
+  return candidates[0][1].labels
+    .sort((a, b) => a.length - b.length || a.localeCompare(b))[0];
+}
+
+function isGloballyMergeableSignature(signature) {
+  const tokens = String(signature || "").split(/\s+/).filter(Boolean);
+  if (tokens.length >= 3) return true;
+  const specificCompoundTokens = new Set([
+    "computer_vision",
+    "customer_service",
+    "data_center",
+    "deep_learning",
+    "drug_discovery",
+    "foundation_model",
+    "recurring_revenue",
+    "use_case"
+  ]);
+  return tokens.length >= 2 && tokens.some((tok) => specificCompoundTokens.has(tok));
+}
+
+function flattenOpenCodes(modelDataByName, unitToEvidenceCluster) {
+  const rows = [];
+  for (const model of MODELS) {
+    for (const unit of modelDataByName[model].allUnits) {
+      const evidenceClusterId = unitToEvidenceCluster.get(unit.globalUnitId) || `EVC_UNMAPPED_${unit.globalUnitId}`;
+      unit.codes.forEach((code, codeIndex) => {
+        rows.push({
+          model,
+          companyid: unit.companyid,
+          keydevid: unit.keydevid,
+          meeting_key: unit.meetingKey,
+          evidence_cluster_id: evidenceClusterId,
+          global_unit_id: unit.globalUnitId,
+          unit_id: unit.unit_id,
+          code_id: code.code_id,
+          global_code_id: `${unit.globalUnitId}:${code.code_id}:${codeIndex}`,
+          confidence: unit.confidence,
+          evidence_class: unit.evidence_class,
+          label: code.label,
+          normalized_label: code.normLabel,
+          label_family: code.family,
+          semantic_signature: code.semantic_signature,
+          source_json: sourceJsonRel(model, unit.companyid, unit.keydevid),
+          code_text: code.text,
+          rationale: code.rationale,
+          unit_text: unit.text
+        });
+      });
+    }
+  }
+  return rows;
+}
+
+function buildSemanticCanonicalization(modelDataByName, unitToEvidenceCluster, evidenceClusterRows) {
+  const allCodes = flattenOpenCodes(modelDataByName, unitToEvidenceCluster);
+  const ids = allCodes.map((code) => code.global_code_id);
+  const uf = new UnionFind(ids);
+  const bySignature = new Map();
+  const byEvidenceCluster = new Map();
+  const byId = new Map(allCodes.map((code) => [code.global_code_id, code]));
+
+  for (const code of allCodes) {
+    if (isGloballyMergeableSignature(code.semantic_signature)) {
+      if (!bySignature.has(code.semantic_signature)) bySignature.set(code.semantic_signature, []);
+      bySignature.get(code.semantic_signature).push(code);
+    }
+    if (!byEvidenceCluster.has(code.evidence_cluster_id)) byEvidenceCluster.set(code.evidence_cluster_id, []);
+    byEvidenceCluster.get(code.evidence_cluster_id).push(code);
+  }
+
+  for (const group of bySignature.values()) {
+    for (let i = 1; i < group.length; i++) {
+      uf.union(group[0].global_code_id, group[i].global_code_id);
+    }
+  }
+
+  for (const group of byEvidenceCluster.values()) {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        if (isSemanticCodeMatch(group[i], group[j], true)) {
+          uf.union(group[i].global_code_id, group[j].global_code_id);
+        }
+      }
+    }
+  }
+
+  const groups = new Map();
+  for (const code of allCodes) {
+    const root = uf.find(code.global_code_id);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(code);
+  }
+
+  const sortedGroups = [...groups.values()].sort((a, b) => {
+    const aLabel = chooseCanonicalLabel(a);
+    const bLabel = chooseCanonicalLabel(b);
+    return b.length - a.length || aLabel.localeCompare(bLabel);
+  });
+
+  const rootToCanonical = new Map();
+  const canonicalCodebookRows = [];
+  sortedGroups.forEach((codes, index) => {
+    const canonicalCodeId = `CAN_${String(index + 1).padStart(5, "0")}`;
+    const canonicalLabel = chooseCanonicalLabel(codes);
+    const signatureCounts = new Map();
+    const rawLabels = new Set();
+    const modelCounts = Object.fromEntries(MODELS.map((model) => [`${model}_codes`, 0]));
+    codes.forEach((code) => {
+      rawLabels.add(code.label);
+      signatureCounts.set(code.semantic_signature, (signatureCounts.get(code.semantic_signature) || 0) + 1);
+      modelCounts[`${code.model}_codes`] += 1;
+    });
+    const dominantSignature = [...signatureCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || "";
+    const modelsPresent = new Set(codes.map((code) => code.model));
+    const evidenceClusters = new Set(codes.map((code) => code.evidence_cluster_id));
+    const meetings = new Set(codes.map((code) => code.meeting_key));
+    codes.forEach((code) => rootToCanonical.set(uf.find(code.global_code_id), canonicalCodeId));
+    canonicalCodebookRows.push({
+      canonical_code_id: canonicalCodeId,
+      canonical_label: canonicalLabel,
+      semantic_signature: dominantSignature,
+      total_codes: codes.length,
+      model_count: modelsPresent.size,
+      models_present: [...modelsPresent].sort().join("|"),
+      ...modelCounts,
+      evidence_cluster_count: evidenceClusters.size,
+      meeting_count: meetings.size,
+      raw_label_variant_count: rawLabels.size,
+      sample_raw_labels: [...rawLabels].sort().slice(0, 8).join(" | "),
+      sample_code_texts: [...new Set(codes.map((code) => code.code_text).filter(Boolean))].slice(0, 3).join(" || ")
+    });
+  });
+
+  const canonicalById = new Map(canonicalCodebookRows.map((row) => [row.canonical_code_id, row]));
+  const mappingRows = allCodes.map((code) => {
+    const canonicalCodeId = rootToCanonical.get(uf.find(code.global_code_id));
+    const canonical = canonicalById.get(canonicalCodeId);
+    return {
+      ...code,
+      canonical_code_id: canonicalCodeId,
+      canonical_label: canonical?.canonical_label || "",
+      canonical_signature: canonical?.semantic_signature || ""
+    };
+  });
+
+  const duplicateAuditRows = canonicalCodebookRows
+    .filter((row) => row.total_codes > 1 && row.raw_label_variant_count > 1)
+    .sort((a, b) => b.total_codes - a.total_codes || b.raw_label_variant_count - a.raw_label_variant_count)
+    .map((row) => ({
+      canonical_code_id: row.canonical_code_id,
+      canonical_label: row.canonical_label,
+      semantic_signature: row.semantic_signature,
+      total_codes: row.total_codes,
+      model_count: row.model_count,
+      models_present: row.models_present,
+      raw_label_variant_count: row.raw_label_variant_count,
+      evidence_cluster_count: row.evidence_cluster_count,
+      sample_raw_labels: row.sample_raw_labels,
+      sample_code_texts: row.sample_code_texts
+    }));
+
+  const consistencyRows = evidenceClusterRows.map((cluster) => {
+    const codes = mappingRows.filter((code) => code.evidence_cluster_id === cluster.evidence_cluster_id);
+    const row = {
+      evidence_cluster_id: cluster.evidence_cluster_id,
+      companyid: cluster.companyid,
+      keydevid: cluster.keydevid,
+      meeting_key: cluster.meeting_key,
+      evidence_model_count: cluster.model_count,
+      evidence_models_present: cluster.models_present,
+      raw_code_count: codes.length,
+      canonical_code_count: new Set(codes.map((code) => code.canonical_code_id)).size
+    };
+    const rawSets = {};
+    const canonicalSets = {};
+    for (const model of MODELS) {
+      const modelCodes = codes.filter((code) => code.model === model);
+      rawSets[model] = new Set(modelCodes.map((code) => code.normalized_label).filter(Boolean));
+      canonicalSets[model] = new Set(modelCodes.map((code) => code.canonical_code_id).filter(Boolean));
+      row[`${model}_raw_labels`] = [...rawSets[model]].sort().join("|");
+      row[`${model}_canonical_codes`] = [...canonicalSets[model]].sort().join("|");
+      row[`${model}_canonical_labels`] = [...new Set(modelCodes.map((code) => code.canonical_label).filter(Boolean))].sort().join("|");
+    }
+    const presentModels = MODELS.filter((model) => rawSets[model].size || canonicalSets[model].size);
+    const rawPairScores = [];
+    const canonicalPairScores = [];
+    for (let i = 0; i < presentModels.length; i++) {
+      for (let j = i + 1; j < presentModels.length; j++) {
+        rawPairScores.push(jaccard(rawSets[presentModels[i]], rawSets[presentModels[j]]));
+        canonicalPairScores.push(jaccard(canonicalSets[presentModels[i]], canonicalSets[presentModels[j]]));
+      }
+    }
+    const meanRaw = rawPairScores.reduce((sum, score) => sum + score, 0) / Math.max(rawPairScores.length, 1);
+    const meanCanonical = canonicalPairScores.reduce((sum, score) => sum + score, 0) / Math.max(canonicalPairScores.length, 1);
+    row.mean_pairwise_raw_label_jaccard = meanRaw;
+    row.mean_pairwise_semantic_code_jaccard = meanCanonical;
+    row.semantic_gain = meanCanonical - meanRaw;
+    row.shared_canonical_code_count = [...new Set(codes.map((code) => code.canonical_code_id))]
+      .filter((canonicalId) => MODELS.filter((model) => canonicalSets[model].has(canonicalId)).length >= 2).length;
+    row.three_model_canonical_code_count = [...new Set(codes.map((code) => code.canonical_code_id))]
+      .filter((canonicalId) => MODELS.filter((model) => canonicalSets[model].has(canonicalId)).length >= 3).length;
+    row.sample_text = cluster.sample_text;
+    return row;
+  });
+
+  const semanticAgreementRows = [];
+  for (let i = 0; i < MODELS.length; i++) {
+    for (let j = i + 1; j < MODELS.length; j++) {
+      const a = MODELS[i];
+      const b = MODELS[j];
+      const eligible = consistencyRows.filter((row) => row[`${a}_canonical_codes`] && row[`${b}_canonical_codes`]);
+      const rawScores = eligible.map((row) => jaccard(new Set(row[`${a}_raw_labels`].split("|").filter(Boolean)), new Set(row[`${b}_raw_labels`].split("|").filter(Boolean))));
+      const canonicalScores = eligible.map((row) => jaccard(new Set(row[`${a}_canonical_codes`].split("|").filter(Boolean)), new Set(row[`${b}_canonical_codes`].split("|").filter(Boolean))));
+      const meanRaw = rawScores.reduce((sum, score) => sum + score, 0) / Math.max(rawScores.length, 1);
+      const meanCanonical = canonicalScores.reduce((sum, score) => sum + score, 0) / Math.max(canonicalScores.length, 1);
+      semanticAgreementRows.push({
+        pair: `${a} vs ${b}`,
+        model_a: a,
+        model_b: b,
+        shared_evidence_clusters: eligible.length,
+        mean_raw_label_jaccard: meanRaw,
+        mean_semantic_code_jaccard: meanCanonical,
+        mean_semantic_gain: meanCanonical - meanRaw,
+        clusters_with_semantic_gain: eligible.filter((row) => row.semantic_gain > 0.001).length,
+        clusters_with_shared_canonical_code: eligible.filter((row) => row.shared_canonical_code_count > 0).length
+      });
+    }
+  }
+
+  const modelSemanticRows = MODELS.map((model) => {
+    const modelCodes = mappingRows.filter((code) => code.model === model);
+    const rawLabels = new Set(modelCodes.map((code) => code.normalized_label).filter(Boolean));
+    const lexicalFamilies = new Set(modelCodes.map((code) => code.label_family).filter(Boolean));
+    const canonicalCodes = new Set(modelCodes.map((code) => code.canonical_code_id).filter(Boolean));
+    return {
+      model,
+      raw_codes: modelCodes.length,
+      unique_normalized_labels: rawLabels.size,
+      label_families: lexicalFamilies.size,
+      semantic_canonical_codes: canonicalCodes.size,
+      semantic_codebook_per_code_rate: canonicalCodes.size / Math.max(modelCodes.length, 1),
+      canonical_reduction_vs_raw_labels: 1 - (canonicalCodes.size / Math.max(rawLabels.size, 1)),
+      canonical_reduction_vs_label_families: 1 - (canonicalCodes.size / Math.max(lexicalFamilies.size, 1))
+    };
+  });
+
+  const globalSummary = {
+    raw_codes: mappingRows.length,
+    unique_normalized_labels: new Set(mappingRows.map((code) => code.normalized_label).filter(Boolean)).size,
+    label_families: new Set(mappingRows.map((code) => code.label_family).filter(Boolean)).size,
+    semantic_canonical_codes: canonicalCodebookRows.length,
+    canonical_reduction_vs_raw_labels: 1 - (canonicalCodebookRows.length / Math.max(new Set(mappingRows.map((code) => code.normalized_label).filter(Boolean)).size, 1)),
+    canonical_reduction_vs_label_families: 1 - (canonicalCodebookRows.length / Math.max(new Set(mappingRows.map((code) => code.label_family).filter(Boolean)).size, 1)),
+    mean_pairwise_raw_label_jaccard: semanticAgreementRows.reduce((sum, row) => sum + row.mean_raw_label_jaccard, 0) / Math.max(semanticAgreementRows.length, 1),
+    mean_pairwise_semantic_code_jaccard: semanticAgreementRows.reduce((sum, row) => sum + row.mean_semantic_code_jaccard, 0) / Math.max(semanticAgreementRows.length, 1)
+  };
+  globalSummary.mean_semantic_gain = globalSummary.mean_pairwise_semantic_code_jaccard - globalSummary.mean_pairwise_raw_label_jaccard;
+
+  return {
+    allOpenCodeRows: mappingRows,
+    canonicalCodebookRows,
+    duplicateAuditRows,
+    consistencyRows,
+    semanticAgreementRows,
+    modelSemanticRows,
+    semanticGlobalSummary: globalSummary
+  };
 }
 
 function boundaryRows(modelDataByName) {
@@ -1007,8 +1453,52 @@ function sectionTitle(icon, title) {
 }
 
 function generateHtml(reportData) {
-  const { generated_at, pricingSource, modelSummaries, pairSummaries, consensus, labelRows, boundaryExamples, disagreementExamples, promptAuditRows, improvedPrompt, outputFiles } = reportData;
+  const { generated_at, pricingSource, benchmarkInputSummary, benchmarkModelRequests, modelSummaries, pairSummaries, consensus, labelRows, semantic, boundaryExamples, disagreementExamples, promptAuditRows, improvedPrompt, outputFiles } = reportData;
   const topFamilies = labelRows.slice(0, 15);
+  const topCanonicalCodes = (semantic?.canonicalCodebookRows || []).slice().sort((a, b) => b.total_codes - a.total_codes).slice(0, 15);
+  const summaryValue = (metric) => benchmarkInputSummary?.find((row) => row.metric === metric)?.value ?? 0;
+  const benchmarkSummaryTable = table(
+    [
+      tip("指标", "用于说明这批 benchmark 输入和 Batch 输出的基本规模。"),
+      "数值",
+      tip("说明", "解释这个数值的计算口径。")
+    ],
+    benchmarkInputSummary || [],
+    (r) => [
+      escapeHtml(r.metric),
+      typeof r.value === "number" ? num(r.value, Number.isInteger(r.value) ? 0 : 4) : escapeHtml(r.value),
+      escapeHtml(r.note)
+    ]
+  );
+  const benchmarkRequestTable = table(
+    [
+      "模型",
+      tip("Expected requests", "按三模型会议并集计算，每个模型应该处理的 companyid:keydevid 请求数。"),
+      tip("Output files", "实际收集到的 open-coding JSON 文件数。"),
+      tip("Missing", "相对三模型会议并集缺少的输出数。"),
+      tip("Usage records", "找到 raw Batch usage 的响应记录数。"),
+      tip("Empty", "返回空 JSON 数组的输出数。"),
+      tip("Nonempty", "至少有一个 meaning unit 的输出数。"),
+      "公司数",
+      "Input tokens",
+      "Output tokens",
+      "Batch 成本"
+    ],
+    benchmarkModelRequests || [],
+    (r) => [
+      escapeHtml(r.model),
+      r.expected_requests,
+      r.collected_output_files,
+      r.missing_outputs,
+      r.usage_records,
+      r.empty_outputs,
+      r.nonempty_outputs,
+      r.companies,
+      Number(r.input_tokens).toLocaleString("en-US"),
+      Number(r.output_tokens).toLocaleString("en-US"),
+      `$${num(r.estimated_batch_cost_usd, 4)}`
+    ]
+  );
   const modelSummaryTable = table(
     [
       "模型",
@@ -1019,6 +1509,7 @@ function generateHtml(reportData) {
       tip("Open codes/Unit", "平均每个 evidence unit 生成几个 open codes；越高通常代表编码更细，但也可能更碎片化。"),
       tip("Unique labels", "去重后的原始 open-code label 数量，用来观察标签分散程度。"),
       tip("Label families", "轻量归并后的 label family 数量，用来估计 codebook 归并压力。"),
+      tip("Canonical codes", "新增语义规范化层后的 canonical code 数量；保留 raw label，不覆盖原始开放编码。"),
       tip("Batch 成本", "按 raw batch usage 和官方 Batch 折扣价计算的美元成本。"),
       tip("成本/Unit", "每产生一个 meaning unit 的平均成本；用于比较研究产出效率。"),
       tip("Generic Risk", "缺少明确 AI 词、但包含 digital/data/cloud/analytics 等泛技术词的片段比例；这是人工复核优先级，不是自动错误率。")
@@ -1033,6 +1524,7 @@ function generateHtml(reportData) {
       num(r.avg_codes_per_unit),
       r.unique_normalized_labels,
       r.label_families,
+      r.semantic_canonical_codes,
       `${num(r.estimated_batch_cost_usd, 4)}`,
       `$${num(r.cost_per_unit_usd, 5)}`,
       pct(r.generic_digital_risk_rate)
@@ -1140,6 +1632,73 @@ function generateHtml(reportData) {
       escapeHtml(r.sample_labels)
     ]
   );
+  const semanticModelTable = table(
+    [
+      "模型",
+      tip("Raw codes", "该模型原始 open-code 条目总数。"),
+      tip("Unique labels", "只做大小写/标点/空白规范化后的 label 数。"),
+      tip("Label families", "当前轻量词汇归并后的 label family 数。"),
+      tip("Canonical codes", "新增 semantic canonicalization 后的唯一概念数。"),
+      tip("压缩 raw labels", "Canonical codes 相对 unique normalized labels 的减少比例。"),
+      tip("压缩 label families", "Canonical codes 相对 lightweight label families 的减少比例。")
+    ],
+    semantic?.modelSemanticRows || [],
+    (r) => [
+      escapeHtml(r.model),
+      r.raw_codes,
+      r.unique_normalized_labels,
+      r.label_families,
+      r.semantic_canonical_codes,
+      pct(r.canonical_reduction_vs_raw_labels),
+      pct(r.canonical_reduction_vs_label_families)
+    ]
+  );
+  const semanticAgreementTable = table(
+    [
+      "模型对",
+      tip("共享 evidence clusters", "两个模型都在同一 evidence cluster 下产生了 codes 的 cluster 数。"),
+      tip("Raw label Jaccard", "在共享 evidence cluster 内，两个模型 raw normalized labels 的平均集合相似度。"),
+      tip("Semantic code Jaccard", "映射到 canonical_code_id 后的平均集合相似度。"),
+      tip("Semantic gain", "Semantic code Jaccard 减 raw label Jaccard。大于 0 表示同义漂移被归并后，一致性更清楚。"),
+      tip("有提升 clusters", "semantic_gain > 0 的 evidence clusters 数。"),
+      tip("有共享 canonical code", "两个模型至少共享一个 canonical code 的 evidence clusters 数。")
+    ],
+    semantic?.semanticAgreementRows || [],
+    (r) => [
+      escapeHtml(r.pair),
+      r.shared_evidence_clusters,
+      pct(r.mean_raw_label_jaccard),
+      pct(r.mean_semantic_code_jaccard),
+      pct(r.mean_semantic_gain),
+      r.clusters_with_semantic_gain,
+      r.clusters_with_shared_canonical_code
+    ]
+  );
+  const canonicalCodeTable = table(
+    [
+      tip("Canonical Code", "语义规范化后的唯一 code id。"),
+      tip("Canonical Label", "保留原始 label 中最具代表性的短标签作为 canonical label。"),
+      "总 codes",
+      "模型数",
+      "5.5",
+      "5.4",
+      "5.4mini",
+      tip("Raw label variants", "被归到同一 canonical code 的不同原始 label 数。"),
+      tip("样例 raw labels", "用于人工审计 canonical 合并是否合理。")
+    ],
+    topCanonicalCodes,
+    (r) => [
+      escapeHtml(r.canonical_code_id),
+      escapeHtml(r.canonical_label),
+      r.total_codes,
+      r.model_count,
+      r["5.5_codes"],
+      r["5.4_codes"],
+      r["5.4mini_codes"],
+      r.raw_label_variant_count,
+      escapeHtml(r.sample_raw_labels)
+    ]
+  );
   const boundaryTable = table(
     [
       "模型",
@@ -1235,7 +1794,8 @@ function generateHtml(reportData) {
       tip("Open codes 数量", "每个 meaning unit 的 codes[] 数组条目总和；这是 open coding 实际产出的 code 条目数。"),
       tip("Open codes/Unit", "Open codes 数量除以 meaning units，用来判断编码粒度。"),
       tip("Unique labels", "去重后的原始 open-code label 数量。"),
-      tip("Label families", "轻量词汇归并后的 label family 数量，用来估计 codebook 归并压力。")
+      tip("Label families", "轻量词汇归并后的 label family 数量，用来估计 codebook 归并压力。"),
+      tip("Canonical codes", "新增 semantic canonicalization 后的唯一概念数。")
     ],
     modelSummaries,
     (r) => [
@@ -1244,7 +1804,8 @@ function generateHtml(reportData) {
       r.codes,
       num(r.avg_codes_per_unit),
       r.unique_normalized_labels,
-      r.label_families
+      r.label_families,
+      r.semantic_canonical_codes
     ]
   );
   const promptAuditTable = table(
@@ -1458,6 +2019,7 @@ function generateHtml(reportData) {
       <a href="#pairwise"><i class="fa-solid fa-link"></i>Evidence 重叠</a>
       <a href="#consensus"><i class="fa-solid fa-diagram-project"></i>Consensus</a>
       <a href="#labels"><i class="fa-solid fa-tags"></i>Label Family</a>
+      <a href="#semantic"><i class="fa-solid fa-object-group"></i>Semantic Canonical</a>
       <a href="#boundary"><i class="fa-solid fa-triangle-exclamation"></i>Boundary Risk</a>
       <a href="#divergence"><i class="fa-solid fa-arrows-left-right-to-line"></i>高分歧会议</a>
       <a href="#unique"><i class="fa-solid fa-eye"></i>独有 Evidence</a>
@@ -1469,6 +2031,7 @@ function generateHtml(reportData) {
       ${sectionTitle("fa-compass", "执行摘要")}
       <p>这份报告不分析这批输入资料的实质内容，而是把它当作 benchmark，用来评估 Batch API 下不同模型作为开放编码器的行为差异。</p>
       <ul>
+        <li>本次 benchmark 覆盖 <strong>${summaryValue("company_count")}</strong> 家公司、<strong>${summaryValue("meeting_count")}</strong> 个 companyid:keydevid 会议；三模型合计预期 <strong>${summaryValue("expected_model_meeting_requests")}</strong> 个 model-meeting requests，实际收集 <strong>${summaryValue("collected_output_files")}</strong> 个 open-coding JSON 输出。</li>
         <li><strong>5.5</strong> 的 coding density 最高，平均每个 meaning unit 产生 ${num(densestCodes.avg_codes_per_unit)} 个 open codes；适合为后续 axial coding 提供更丰富的机制线索。</li>
         <li><strong>5.4</strong> 的 meaning units 總數最高（${largestUnits.units}），表现为较高 sensitivity，或者更积极的 candidate evidence discovery。</li>
         <li><strong>${escapeHtml(highestRisk.model)}</strong> 的 generic digital/data 風險比例最高（${pct(highestRisk.generic_digital_risk_rate)}）；这些片段需要人工复核后才能视为实质 AI 讨论。</li>
@@ -1485,6 +2048,16 @@ function generateHtml(reportData) {
     <section id="setup">
       ${sectionTitle("fa-flask", "Benchmark 设置")}
       <p>输入资料只是随机选取的测试样本。公司、年份、产业或具体 evidence 内容主要作为 audit probes，用于观察模型行为；不应被解读为对公司 AI 策略本身的研究结论。</p>
+      <div class="grid">
+        <div class="metric"><span class="value">${summaryValue("company_count")}</span><span class="label">公司数</span></div>
+        <div class="metric"><span class="value">${summaryValue("meeting_count")}</span><span class="label">会议 / keydevid 数</span></div>
+        <div class="metric"><span class="value">${summaryValue("expected_model_meeting_requests")}</span><span class="label">预期 model-meeting requests</span></div>
+        <div class="metric"><span class="value">${summaryValue("collected_output_files")}</span><span class="label">实际 JSON 输出</span></div>
+      </div>
+      <h3>输入与请求基本信息</h3>
+      ${benchmarkSummaryTable}
+      <h3>各模型请求与输出覆盖</h3>
+      ${benchmarkRequestTable}
     </section>
 
     <section id="profiles">
@@ -1506,6 +2079,7 @@ function generateHtml(reportData) {
         <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.units, 0)}</span><span class="label">总 meaning units</span></div>
         <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.codes, 0)}</span><span class="label">Open codes 数量</span></div>
         <div class="metric"><span class="value">${modelSummaries.reduce((s, r) => s + r.label_families, 0)}</span><span class="label">Label families 合计</span></div>
+        <div class="metric"><span class="value">${semantic?.semanticGlobalSummary?.semantic_canonical_codes || 0}</span><span class="label">Semantic canonical codes</span></div>
         <div class="metric"><span class="value">${consensus.three_model_components}</span><span class="label">三模型共识 evidence clusters</span></div>
       </div>
       <h3>各模型 Open codes 具体数量</h3>
@@ -1533,7 +2107,7 @@ function generateHtml(reportData) {
 
     <section id="method">
       ${sectionTitle("fa-scale-balanced", "方法与口径")}
-      <p>比較分為 exact text、containment 和 fuzzy evidence 三層。fuzzy 使用 token Jaccard，閾值為 <code>${FUZZY_THRESHOLD}</code>。Label family 是輕量詞彙歸併，不等於最終語義 codebook。Boundary risk 也是詞彙風險提示，不是自動錯誤判定。</p>
+      <p>比較分為 exact text、containment 和 fuzzy evidence 三層。fuzzy 使用 token Jaccard，閾值為 <code>${FUZZY_THRESHOLD}</code>。Label family 是輕量詞彙歸併；新增 Semantic Canonicalization 层会在保留 raw codes 的基础上，把同义漂移映射到 canonical_code_id。Boundary risk 是詞彙風險提示，不是自動錯誤判定。</p>
       <p>成本按 OpenAI 官方價格頁計算：標準價每 1M tokens 為 GPT-5.5 $5/$30、GPT-5.4 $2.50/$15、GPT-5.4 mini $0.75/$4.50，Batch API 對輸入和輸出節省 50%。價格核對日期：${escapeHtml(pricingSource.checked_date)}；來源：<a href="${escapeHtml(pricingSource.official_url)}">${escapeHtml(pricingSource.official_url)}</a>。</p>
       <p class="note">完整规范见 <code>analysis/model_comparison_spec.md</code>。所有 CSV/JSON 产物位于 <code>analysis/model_comparison/</code>。</p>
     </section>
@@ -1593,6 +2167,19 @@ function generateHtml(reportData) {
       ${familyTable}
     </section>
 
+    <section id="semantic">
+      ${sectionTitle("fa-object-group", "Semantic Canonicalization")}
+      <p>这一层不覆盖原始开放编码，而是把每条 raw code 映射到 <code>canonical_code_id</code>，用于做更公平的一致性检验。它优先在同一 evidence cluster 内合并同义 label，也会把明显相同的语义签名归入同一 canonical code。</p>
+      <p><span class="pill">Raw codes: ${semantic?.semanticGlobalSummary?.raw_codes || 0}</span><span class="pill">Unique labels: ${semantic?.semanticGlobalSummary?.unique_normalized_labels || 0}</span><span class="pill">Canonical codes: ${semantic?.semanticGlobalSummary?.semantic_canonical_codes || 0}</span><span class="pill">Raw label 压缩: ${pct(semantic?.semanticGlobalSummary?.canonical_reduction_vs_raw_labels || 0)}</span></p>
+      <h3>模型级 semantic codebook 压缩</h3>
+      ${semanticModelTable}
+      <h3>Raw label vs semantic canonical 一致性</h3>
+      ${semanticAgreementTable}
+      <h3>高频 canonical codes</h3>
+      ${canonicalCodeTable}
+      <p class="note">详细审计文件包括 <code>all_open_codes_long.csv</code>、<code>canonical_codebook.csv</code>、<code>semantic_duplicate_audit.csv</code> 和 <code>canonical_consistency_by_evidence_cluster.csv</code>。</p>
+    </section>
+
     <section id="boundary">
       ${sectionTitle("fa-triangle-exclamation", "Boundary Risk 审计样例")}
       <p class="note">以下優先展示 generic digital/data 風險片段。它們未必錯誤，但需要確認是否真的有本地 AI/ML/model-driven 語境支撐。</p>
@@ -1648,9 +2235,20 @@ async function main() {
   modelDataList.forEach((data) => data.meetings.forEach((_, key) => allMeetingKeys.add(key)));
 
   const modelSummaries = modelDataList.map((data) => summarizeModel(data, allMeetingKeys));
+  const benchmarkInputSummary = benchmarkInputSummaryRows(modelSummaries, allMeetingKeys);
+  const benchmarkModelRequests = benchmarkModelRequestRows(modelSummaries, allMeetingKeys);
   const meetings = meetingRows(modelDataByName, allMeetingKeys);
   const { rows: pairRows, unitMatchRows, pairSummaries } = pairwiseRows(modelDataByName, allMeetingKeys);
-  const { consensusCounts, uniqueUnits } = buildConsensus(modelDataByName, allMeetingKeys);
+  const { consensusCounts, uniqueUnits, unitToEvidenceCluster, evidenceClusterRows } = buildConsensus(modelDataByName, allMeetingKeys);
+  const semantic = buildSemanticCanonicalization(modelDataByName, unitToEvidenceCluster, evidenceClusterRows);
+  const semanticByModel = Object.fromEntries(semantic.modelSemanticRows.map((row) => [row.model, row]));
+  modelSummaries.forEach((row) => {
+    const semanticRow = semanticByModel[row.model] || {};
+    row.semantic_canonical_codes = semanticRow.semantic_canonical_codes || 0;
+    row.semantic_codebook_per_code_rate = semanticRow.semantic_codebook_per_code_rate || 0;
+    row.canonical_reduction_vs_raw_labels = semanticRow.canonical_reduction_vs_raw_labels || 0;
+    row.canonical_reduction_vs_label_families = semanticRow.canonical_reduction_vs_label_families || 0;
+  });
   const labels = labelFamilyRows(modelDataByName);
   const costRows = costEfficiencyRows(modelSummaries);
   const boundary = boundaryRows(modelDataByName);
@@ -1661,11 +2259,19 @@ async function main() {
     .slice(0, 18);
 
   const outputFiles = [
+    "benchmark_input_summary.csv",
+    "benchmark_model_request_summary.csv",
     "model_level_summary.csv",
     "meeting_level_comparison.csv",
     "pairwise_meeting_differences.csv",
     "unit_matching_table.csv",
     "label_family_comparison.csv",
+    "all_open_codes_long.csv",
+    "canonical_codebook.csv",
+    "semantic_duplicate_audit.csv",
+    "canonical_consistency_by_evidence_cluster.csv",
+    "model_semantic_agreement_summary.csv",
+    "model_semantic_code_summary.csv",
     "boundary_risk_audit.csv",
     "cost_efficiency_summary.csv",
     "prompt_design_audit.csv",
@@ -1675,7 +2281,21 @@ async function main() {
     "report_data.json",
     "model_comparison_report.html"
   ];
+  const stalePdfFiles = [
+    "model_comparison_report.pdf",
+    "model_comparison_report_continuous.pdf"
+  ];
+  for (const file of stalePdfFiles) {
+    await fsp.rm(path.join(OUT_DIR, file), { force: true });
+  }
 
+  await writeCsv(path.join(OUT_DIR, "benchmark_input_summary.csv"), benchmarkInputSummary, [
+    "metric", "value", "note"
+  ]);
+  await writeCsv(path.join(OUT_DIR, "benchmark_model_request_summary.csv"), benchmarkModelRequests, [
+    "model", "expected_requests", "collected_output_files", "missing_outputs", "usage_records",
+    "empty_outputs", "nonempty_outputs", "companies", "input_tokens", "output_tokens", "estimated_batch_cost_usd"
+  ]);
   await writeCsv(path.join(OUT_DIR, "model_level_summary.csv"), modelSummaries, [
     "model", "company_count", "output_files", "missing_files_vs_union", "empty_files", "nonempty_files", "nonempty_rate",
     "api_model_name", "standard_input_per_1m_usd", "standard_cached_input_per_1m_usd", "standard_output_per_1m_usd",
@@ -1684,6 +2304,7 @@ async function main() {
     "avg_units_per_nonempty_file", "avg_codes_per_unit", "avg_words_per_unit", "median_words_per_unit",
     "explicit_ai_units", "possible_ai_technical_units", "generic_digital_risk_units", "no_lexical_ai_signal_units",
     "generic_digital_risk_rate", "unique_normalized_labels", "label_families", "label_family_per_code_rate",
+    "semantic_canonical_codes", "semantic_codebook_per_code_rate", "canonical_reduction_vs_raw_labels", "canonical_reduction_vs_label_families",
     "invalid_json_files", "malformed_top_level_files", "validation_problem_count", "code_text_not_in_unit_text",
     "bad_confidence", "wrong_analysis_type", "codes_not_array",
     "usage_records", "input_tokens", "cached_input_tokens", "output_tokens", "total_tokens", "estimated_batch_cost_usd",
@@ -1709,6 +2330,35 @@ async function main() {
   ]);
   await writeCsv(path.join(OUT_DIR, "label_family_comparison.csv"), labels, [
     "label_family", "total_codes", "model_count", "models_present", "5.5_codes", "5.4_codes", "5.4mini_codes", "sample_labels"
+  ]);
+  await writeCsv(path.join(OUT_DIR, "all_open_codes_long.csv"), semantic.allOpenCodeRows, [
+    "model", "companyid", "keydevid", "meeting_key", "evidence_cluster_id", "global_unit_id", "unit_id", "code_id", "global_code_id",
+    "confidence", "evidence_class", "label", "normalized_label", "label_family", "semantic_signature",
+    "canonical_code_id", "canonical_label", "canonical_signature", "source_json", "code_text", "rationale", "unit_text"
+  ]);
+  await writeCsv(path.join(OUT_DIR, "canonical_codebook.csv"), semantic.canonicalCodebookRows, [
+    "canonical_code_id", "canonical_label", "semantic_signature", "total_codes", "model_count", "models_present",
+    ...MODELS.map((model) => `${model}_codes`),
+    "evidence_cluster_count", "meeting_count", "raw_label_variant_count", "sample_raw_labels", "sample_code_texts"
+  ]);
+  await writeCsv(path.join(OUT_DIR, "semantic_duplicate_audit.csv"), semantic.duplicateAuditRows, [
+    "canonical_code_id", "canonical_label", "semantic_signature", "total_codes", "model_count", "models_present",
+    "raw_label_variant_count", "evidence_cluster_count", "sample_raw_labels", "sample_code_texts"
+  ]);
+  await writeCsv(path.join(OUT_DIR, "canonical_consistency_by_evidence_cluster.csv"), semantic.consistencyRows, [
+    "evidence_cluster_id", "companyid", "keydevid", "meeting_key", "evidence_model_count", "evidence_models_present",
+    "raw_code_count", "canonical_code_count",
+    ...MODELS.flatMap((model) => [`${model}_raw_labels`, `${model}_canonical_codes`, `${model}_canonical_labels`]),
+    "mean_pairwise_raw_label_jaccard", "mean_pairwise_semantic_code_jaccard", "semantic_gain",
+    "shared_canonical_code_count", "three_model_canonical_code_count", "sample_text"
+  ]);
+  await writeCsv(path.join(OUT_DIR, "model_semantic_agreement_summary.csv"), semantic.semanticAgreementRows, [
+    "pair", "model_a", "model_b", "shared_evidence_clusters", "mean_raw_label_jaccard",
+    "mean_semantic_code_jaccard", "mean_semantic_gain", "clusters_with_semantic_gain", "clusters_with_shared_canonical_code"
+  ]);
+  await writeCsv(path.join(OUT_DIR, "model_semantic_code_summary.csv"), semantic.modelSemanticRows, [
+    "model", "raw_codes", "unique_normalized_labels", "label_families", "semantic_canonical_codes",
+    "semantic_codebook_per_code_rate", "canonical_reduction_vs_raw_labels", "canonical_reduction_vs_label_families"
   ]);
   await writeCsv(path.join(OUT_DIR, "boundary_risk_audit.csv"), boundary, [
     "model", "companyid", "keydevid", "unit_id", "confidence", "evidence_class", "words", "code_count", "labels", "source_json", "text"
@@ -1740,10 +2390,13 @@ async function main() {
     models: MODELS,
     fuzzy_threshold: FUZZY_THRESHOLD,
     pricingSource: PRICING_SOURCE,
+    benchmarkInputSummary,
+    benchmarkModelRequests,
     modelSummaries,
     pairSummaries,
     consensus: consensusCounts,
     labelRows: labels,
+    semantic,
     promptAuditRows,
     improvedPrompt: {
       filename: PROMPT_V2_FILENAME,
